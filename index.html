@@ -198,6 +198,11 @@ async function toggleMusic() {
     return;
   }
 
+  // If song ended, reset to start
+  if (musicAudio && musicAudio.ended) {
+    musicAudio.currentTime = 0;
+  }
+
   if (!musicAudio) {
     musicAudio = new Audio('https://assets.mixkit.co/music/127/127.mp3');
     musicAudio.crossOrigin = 'anonymous';
@@ -206,6 +211,12 @@ async function toggleMusic() {
     musicSource = audioCtx.createMediaElementSource(musicAudio);
     musicSource.connect(analyser);
     analyser.connect(audioCtx.destination);
+
+    // Fallback loop — some browsers ignore .loop with MediaElementSource
+    musicAudio.addEventListener('ended', () => {
+      musicAudio.currentTime = 0;
+      musicAudio.play().catch(() => {});
+    });
   }
 
   try {
