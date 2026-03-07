@@ -14,8 +14,8 @@
     left: 50%;
     transform: translateX(-50%);
     font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 0.7rem;
-    color: #ffffff30;
+    font-size: 0.65rem;
+    color: #ffffff25;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     pointer-events: none;
@@ -34,11 +34,30 @@
     z-index: 10;
     transition: opacity 0.5s;
   }
+  #audio-btn {
+    position: fixed;
+    top: 1.5rem;
+    left: 2rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.65rem;
+    color: #ffffff50;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: #ffffff08;
+    border: 1px solid #ffffff15;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.3s;
+  }
+  #audio-btn:hover { background: #ffffff15; color: #ffffffa0; }
+  #audio-btn.active { color: #00ffd580; border-color: #00ffd530; }
 </style>
 </head>
 <body>
-<div id="info">click to change palette</div>
+<div id="info">drag cloth &middot; double-click palette &middot; mic for audio reactivity</div>
 <div id="palette-name"></div>
+<button id="audio-btn">enable mic</button>
 
 <script type="importmap">
 {
@@ -57,16 +76,15 @@ import * as THREE from 'three';
 // ═══════════════════════════════════════════════
 const COLS = 120;
 const ROWS = 90;
-const SPACING = 0.045;
+const SPACING = 0.036;           // 80% of 0.045
 const SUBSTEPS = 8;
-const ITERATIONS = 2; // per substep
+const ITERATIONS = 2;
 const GRAVITY = -0.8;
 const DAMPING = 0.998;
-const STRETCH_COMPLIANCE = 0.0;      // inextensible
-const BEND_COMPLIANCE = 0.0001;      // soft bending — flowing fabric
+const STRETCH_COMPLIANCE = 0.0;
+const BEND_COMPLIANCE = 0.0001;
 const AIR_DENSITY = 1.2;
 const DRAG_COEFF = 0.04;
-const CLOTH_THICKNESS = 0.005;
 
 // SA Shweshwe palettes
 const PALETTES = [
@@ -82,6 +100,125 @@ let paletteIdx = 0;
 let palette = PALETTES[0];
 
 // ═══════════════════════════════════════════════
+// ONE-EURO FILTER — speed-adaptive smoothing
+// ═══════════════════════════════════════════════
+class OneEuroFilter {
+  constructor(fcMin = 1.0, beta = 0.007, dCutoff = 1.0) {
+    this.fcMin = fcMin;
+    this.beta = beta;
+    this.dCutoff = dCutoff;
+    this.xPrev = null;
+    this.dxPrev = 0;
+  }
+  _alpha(dt, fc) {
+    const tau = 1.0 / (2 * Math.PI * fc);
+    return 1.0 / (1.0 + tau / dt);
+  }
+  filter(x, dt) {
+    if (this.xPrev === null) { this.xPrev = x; return x; }
+    const dx = (x - this.xPrev) / dt;
+    const adx = this._alpha(dt, this.dCutoff);
+    const dxSmoothed = adx * dx + (1 - adx) * this.dxPrev;
+    const fc = this.fcMin + this.beta * Math.abs(dxSmoothed);
+    const alpha = this._alpha(dt, fc);
+    const result = alpha * x + (1 - alpha) * this.xPrev;
+    this.xPrev = result;
+    this.dxPrev = dxSmoothed;
+    return result;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// AUDIO REACTIVITY — Web Audio API + FFT
+// ═══════════════════════════════════════════════
+let audioCtx = null;
+let analyser = null;
+let freqData = null;
+let audioActive = false;
+
+// Smoothed band values (0-1)
+const audioBands = {
+  subBass: 0,   // 20-60Hz   → large displacement, breathing
+  bass: 0,      // 60-250Hz  → scale pulse, wind intensity
+  lowMid: 0,    // 250-500Hz → gentle sway
+  mid: 0,       // 500-2kHz  → colour warmth shift
+  highMid: 0,   // 2-6kHz    → sparkle density
+  high: 0,      // 6-20kHz   → sheen intensity
+};
+
+// One-Euro filters per band — smooth at rest, responsive to beats
+const bandFilters = {
+  subBass: new OneEuroFilter(0.8, 0.05),
+  bass:    new OneEuroFilter(1.0, 0.08),
+  lowMid:  new OneEuroFilter(1.2, 0.04),
+  mid:     new OneEuroFilter(0.8, 0.03),
+  highMid: new OneEuroFilter(1.5, 0.1),
+  high:    new OneEuroFilter(1.0, 0.06),
+};
+
+function getBandEnergy(data, startHz, endHz, sampleRate, fftSize) {
+  const binWidth = sampleRate / fftSize;
+  const start = Math.max(1, Math.floor(startHz / binWidth));
+  const end = Math.min(Math.floor(endHz / binWidth), data.length - 1);
+  let sum = 0;
+  for (let i = start; i <= end; i++) sum += data[i];
+  return sum / (end - start + 1) / 255; // normalise to 0-1
+}
+
+function updateAudio(dt) {
+  if (!audioActive || !analyser) return;
+  analyser.getByteFrequencyData(freqData);
+  const sr = audioCtx.sampleRate;
+  const fft = analyser.fftSize;
+
+  // Raw band energies with perceptual power curve
+  const raw = {
+    subBass: Math.pow(getBandEnergy(freqData, 20, 60, sr, fft), 1.5),
+    bass:    Math.pow(getBandEnergy(freqData, 60, 250, sr, fft), 1.4),
+    lowMid:  Math.pow(getBandEnergy(freqData, 250, 500, sr, fft), 1.3),
+    mid:     Math.pow(getBandEnergy(freqData, 500, 2000, sr, fft), 1.3),
+    highMid: Math.pow(getBandEnergy(freqData, 2000, 6000, sr, fft), 1.2),
+    high:    Math.pow(getBandEnergy(freqData, 6000, 20000, sr, fft), 1.2),
+  };
+
+  // Filter each band
+  for (const band in raw) {
+    audioBands[band] = bandFilters[band].filter(raw[band], dt);
+  }
+}
+
+async function initAudio() {
+  try {
+    audioCtx = new AudioContext();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const source = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyserNode();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.65;
+    source.connect(analyser);
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    audioActive = true;
+    document.getElementById('audio-btn').classList.add('active');
+    document.getElementById('audio-btn').textContent = 'mic active';
+  } catch (e) {
+    console.warn('Mic access denied:', e);
+  }
+}
+
+document.getElementById('audio-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (!audioActive) {
+    initAudio();
+  } else {
+    audioActive = false;
+    document.getElementById('audio-btn').classList.remove('active');
+    document.getElementById('audio-btn').textContent = 'enable mic';
+    // Zero out bands smoothly
+    for (const band in audioBands) audioBands[band] = 0;
+  }
+});
+
+// ═══════════════════════════════════════════════
 // THREE.JS SETUP
 // ═══════════════════════════════════════════════
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -93,7 +230,7 @@ document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x060608);
-scene.fog = new THREE.FogExp2(0x060608, 0.15);
+scene.fog = new THREE.FogExp2(0x060608, 0.12);
 
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 100);
 camera.position.set(0, 0, 5);
@@ -103,69 +240,52 @@ camera.position.set(0, 0, 5);
 // ═══════════════════════════════════════════════
 const numParticles = COLS * ROWS;
 const pos = new Float32Array(numParticles * 3);
+const restPos = new Float32Array(numParticles * 3);  // rest shape for return
 const prevPos = new Float32Array(numParticles * 3);
 const vel = new Float32Array(numParticles * 3);
 const invMass = new Float32Array(numParticles);
 
-// Constraints
 const distConstraints = [];
 const bendConstraints = [];
 
 function idx(r, c) { return r * COLS + c; }
 
-// Initialise grid — centred, lying flat in XY plane with slight initial wave
+// Initialise grid
 for (let r = 0; r < ROWS; r++) {
   for (let c = 0; c < COLS; c++) {
     const i = idx(r, c);
     const x = (c - (COLS - 1) / 2) * SPACING;
     const y = (r - (ROWS - 1) / 2) * SPACING;
-    const z = Math.sin(c * 0.08 + r * 0.06) * 0.08;
+    const z = Math.sin(c * 0.08 + r * 0.06) * 0.06;
 
-    pos[i * 3] = x;
-    pos[i * 3 + 1] = y;
-    pos[i * 3 + 2] = z;
-    prevPos[i * 3] = x;
-    prevPos[i * 3 + 1] = y;
-    prevPos[i * 3 + 2] = z;
-
+    pos[i*3] = x; pos[i*3+1] = y; pos[i*3+2] = z;
+    restPos[i*3] = x; restPos[i*3+1] = y; restPos[i*3+2] = z;
+    prevPos[i*3] = x; prevPos[i*3+1] = y; prevPos[i*3+2] = z;
     invMass[i] = 1.0;
   }
 }
 
-// Distance constraints (edges)
 function addDist(i0, i1) {
-  const dx = pos[i0*3] - pos[i1*3];
-  const dy = pos[i0*3+1] - pos[i1*3+1];
-  const dz = pos[i0*3+2] - pos[i1*3+2];
-  const restLen = Math.sqrt(dx*dx + dy*dy + dz*dz);
-  distConstraints.push({ i0, i1, restLen });
+  const dx = pos[i0*3]-pos[i1*3], dy = pos[i0*3+1]-pos[i1*3+1], dz = pos[i0*3+2]-pos[i1*3+2];
+  distConstraints.push({ i0, i1, restLen: Math.sqrt(dx*dx+dy*dy+dz*dz) });
 }
 
-// Bending constraints (pairs of triangles sharing an edge)
-function addBend(i0, i1, i2, i3) {
-  // i0-i1 is the shared edge, i2 and i3 are the opposite vertices
-  const dx = pos[i2*3] - pos[i3*3];
-  const dy = pos[i2*3+1] - pos[i3*3+1];
-  const dz = pos[i2*3+2] - pos[i3*3+2];
-  const restLen = Math.sqrt(dx*dx + dy*dy + dz*dz);
-  bendConstraints.push({ i0: i2, i1: i3, restLen });
+function addBend(i2, i3) {
+  const dx = pos[i2*3]-pos[i3*3], dy = pos[i2*3+1]-pos[i3*3+1], dz = pos[i2*3+2]-pos[i3*3+2];
+  bendConstraints.push({ i0: i2, i1: i3, restLen: Math.sqrt(dx*dx+dy*dy+dz*dz) });
 }
 
 for (let r = 0; r < ROWS; r++) {
   for (let c = 0; c < COLS; c++) {
     const i = idx(r, c);
-    // Horizontal
-    if (c < COLS - 1) addDist(i, idx(r, c + 1));
-    // Vertical
-    if (r < ROWS - 1) addDist(i, idx(r + 1, c));
-    // Shear diagonals
-    if (c < COLS - 1 && r < ROWS - 1) {
-      addDist(i, idx(r + 1, c + 1));
-      addDist(idx(r, c + 1), idx(r + 1, c));
+    if (c < COLS-1) addDist(i, idx(r, c+1));
+    if (r < ROWS-1) addDist(i, idx(r+1, c));
+    if (c < COLS-1 && r < ROWS-1) {
+      addDist(i, idx(r+1, c+1));
+      addDist(idx(r, c+1), idx(r+1, c));
     }
-    // Bending — skip one particle
-    if (c < COLS - 2) addBend(i, idx(r, c+1), i, idx(r, c + 2));
-    if (r < ROWS - 2) addBend(i, idx(r+1, c), i, idx(r + 2, c));
+    if (c < COLS-2) addBend(i, idx(r, c+2));
+    if (r < ROWS-2) addBend(i, idx(r+2, c));
   }
 }
 
@@ -175,276 +295,443 @@ function solveConstraint(c, compliance, dt) {
   const wSum = w0 + w1;
   if (wSum === 0) return;
 
-  const dx = pos[i1*3] - pos[i0*3];
-  const dy = pos[i1*3+1] - pos[i0*3+1];
-  const dz = pos[i1*3+2] - pos[i0*3+2];
-  const len = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  const dx = pos[i1*3]-pos[i0*3], dy = pos[i1*3+1]-pos[i0*3+1], dz = pos[i1*3+2]-pos[i0*3+2];
+  const len = Math.sqrt(dx*dx+dy*dy+dz*dz);
   if (len < 1e-8) return;
 
   const alpha = compliance / (dt * dt);
-  const C = len - restLen;
-  const lambda = -C / (wSum + alpha);
+  const lambda = -(len - restLen) / (wSum + alpha);
+  const nx = dx/len, ny = dy/len, nz = dz/len;
 
-  const nx = dx / len, ny = dy / len, nz = dz / len;
-
-  pos[i0*3]   -= w0 * lambda * nx;
-  pos[i0*3+1] -= w0 * lambda * ny;
-  pos[i0*3+2] -= w0 * lambda * nz;
-  pos[i1*3]   += w1 * lambda * nx;
-  pos[i1*3+1] += w1 * lambda * ny;
-  pos[i1*3+2] += w1 * lambda * nz;
+  pos[i0*3]   -= w0*lambda*nx; pos[i0*3+1] -= w0*lambda*ny; pos[i0*3+2] -= w0*lambda*nz;
+  pos[i1*3]   += w1*lambda*nx; pos[i1*3+1] += w1*lambda*ny; pos[i1*3+2] += w1*lambda*nz;
 }
 
-// Wind + air resistance
+// ═══════════════════════════════════════════════
+// DRAG INTERACTION
+// ═══════════════════════════════════════════════
+const raycaster = new THREE.Raycaster();
+const mouseNDC = new THREE.Vector2();
+let grabbed = -1;        // particle index
+let grabDepth = 0;       // distance from camera at grab time
+let grabOffset = new THREE.Vector3();
+let isDragging = false;
+let dragVelocity = new THREE.Vector3();
+let prevDragPos = new THREE.Vector3();
+
+// Sparkle trail state
+const MAX_TRAIL = 600;
+const trailPositions = new Float32Array(MAX_TRAIL * 3);
+const trailAlphas = new Float32Array(MAX_TRAIL);
+const trailSizes = new Float32Array(MAX_TRAIL);
+let trailHead = 0;
+let trailCount = 0;
+
+function getMouseWorldPos(x, y, depth) {
+  const ndc = new THREE.Vector3(
+    (x / window.innerWidth) * 2 - 1,
+    -(y / window.innerHeight) * 2 + 1,
+    0.5
+  );
+  ndc.unproject(camera);
+  const dir = ndc.sub(camera.position).normalize();
+  return camera.position.clone().add(dir.multiplyScalar(depth));
+}
+
+function findNearestParticle(worldPos, maxDist) {
+  let best = -1, bestDist = maxDist * maxDist;
+  for (let i = 0; i < numParticles; i++) {
+    const dx = pos[i*3] - worldPos.x;
+    const dy = pos[i*3+1] - worldPos.y;
+    const dz = pos[i*3+2] - worldPos.z;
+    const d2 = dx*dx + dy*dy + dz*dz;
+    if (d2 < bestDist) { bestDist = d2; best = i; }
+  }
+  return best;
+}
+
+function onPointerDown(e) {
+  if (e.target.id === 'audio-btn') return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  mouseNDC.set((x / rect.width)*2-1, -(y / rect.height)*2+1);
+  raycaster.setFromCamera(mouseNDC, camera);
+
+  const intersects = raycaster.intersectObject(mesh);
+  if (intersects.length > 0) {
+    const hit = intersects[0];
+    grabDepth = hit.distance;
+
+    // Find nearest particle to intersection point
+    grabbed = findNearestParticle(hit.point, 0.3);
+    if (grabbed >= 0) {
+      isDragging = true;
+      invMass[grabbed] = 0; // pin it
+      prevDragPos.set(pos[grabbed*3], pos[grabbed*3+1], pos[grabbed*3+2]);
+
+      // Also grab neighbours for smoother deformation (soft radius)
+      grabNeighbours(grabbed);
+    }
+  }
+}
+
+// Soft grab radius — particles near the grab point get partial influence
+const GRAB_RADIUS = 8; // in grid cells
+let grabInfluence = new Map(); // particleIdx -> weight (0-1)
+
+function grabNeighbours(centerIdx) {
+  grabInfluence.clear();
+  const cr = Math.floor(centerIdx / COLS);
+  const cc = centerIdx % COLS;
+
+  for (let dr = -GRAB_RADIUS; dr <= GRAB_RADIUS; dr++) {
+    for (let dc = -GRAB_RADIUS; dc <= GRAB_RADIUS; dc++) {
+      const r = cr + dr, c = cc + dc;
+      if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
+      const dist = Math.sqrt(dr*dr + dc*dc);
+      if (dist > GRAB_RADIUS) continue;
+      // Smooth falloff — cosine bell
+      const weight = 0.5 * (1 + Math.cos(Math.PI * dist / GRAB_RADIUS));
+      const pi = idx(r, c);
+      grabInfluence.set(pi, weight);
+    }
+  }
+}
+
+function onPointerMove(e) {
+  if (!isDragging || grabbed < 0) return;
+  const worldPos = getMouseWorldPos(e.clientX, e.clientY, grabDepth);
+
+  // Move grabbed particle directly
+  const dx = worldPos.x - pos[grabbed*3];
+  const dy = worldPos.y - pos[grabbed*3+1];
+  const dz = worldPos.z - pos[grabbed*3+2];
+
+  // Apply movement with influence falloff
+  for (const [pi, weight] of grabInfluence) {
+    pos[pi*3]   += dx * weight;
+    pos[pi*3+1] += dy * weight;
+    pos[pi*3+2] += dz * weight;
+    prevPos[pi*3]   += dx * weight;
+    prevPos[pi*3+1] += dy * weight;
+    prevPos[pi*3+2] += dz * weight;
+  }
+
+  // Track drag velocity for momentum on release
+  dragVelocity.set(
+    pos[grabbed*3] - prevDragPos.x,
+    pos[grabbed*3+1] - prevDragPos.y,
+    pos[grabbed*3+2] - prevDragPos.z
+  );
+  prevDragPos.set(pos[grabbed*3], pos[grabbed*3+1], pos[grabbed*3+2]);
+
+  // Emit sparkle trail particles along drag path
+  emitTrailParticles(worldPos, 4);
+}
+
+function onPointerUp() {
+  if (!isDragging || grabbed < 0) return;
+
+  // Transfer momentum to grabbed region
+  const speed = dragVelocity.length() * 60;
+  for (const [pi, weight] of grabInfluence) {
+    vel[pi*3]   += dragVelocity.x * weight * 40;
+    vel[pi*3+1] += dragVelocity.y * weight * 40;
+    vel[pi*3+2] += dragVelocity.z * weight * 40;
+  }
+
+  invMass[grabbed] = 1.0;
+  grabbed = -1;
+  isDragging = false;
+  grabInfluence.clear();
+}
+
+renderer.domElement.addEventListener('pointerdown', onPointerDown);
+renderer.domElement.addEventListener('pointermove', onPointerMove);
+renderer.domElement.addEventListener('pointerup', onPointerUp);
+renderer.domElement.addEventListener('pointerleave', onPointerUp);
+
+// Double-click for palette switch (single click is for drag)
+renderer.domElement.addEventListener('dblclick', (e) => {
+  if (e.target.id === 'audio-btn') return;
+  switchPalette();
+});
+
+// ═══════════════════════════════════════════════
+// SPARKLE TRAIL SYSTEM
+// ═══════════════════════════════════════════════
+function emitTrailParticles(worldPos, count) {
+  for (let i = 0; i < count; i++) {
+    const ti = (trailHead + trailCount) % MAX_TRAIL;
+    // Spread particles slightly around the drag point
+    trailPositions[ti*3]   = worldPos.x + (Math.random()-0.5) * 0.08;
+    trailPositions[ti*3+1] = worldPos.y + (Math.random()-0.5) * 0.08;
+    trailPositions[ti*3+2] = worldPos.z + (Math.random()-0.5) * 0.04;
+    trailAlphas[ti] = 0.8 + Math.random() * 0.2;
+    trailSizes[ti] = 2.0 + Math.random() * 3.0;
+    if (trailCount < MAX_TRAIL) {
+      trailCount++;
+    } else {
+      trailHead = (trailHead + 1) % MAX_TRAIL;
+    }
+  }
+}
+
+function updateTrail(dt) {
+  // Fade all trail particles
+  let alive = 0;
+  for (let j = 0; j < trailCount; j++) {
+    const ti = (trailHead + j) % MAX_TRAIL;
+    trailAlphas[ti] -= dt * 0.4; // fade over ~2.5s
+    // Gentle drift upward
+    trailPositions[ti*3+1] += dt * 0.015;
+    trailPositions[ti*3+2] += (Math.random()-0.5) * dt * 0.01;
+
+    if (trailAlphas[ti] > 0) alive++;
+  }
+  // Remove dead particles from head
+  while (trailCount > 0) {
+    const hi = trailHead;
+    if (trailAlphas[hi] <= 0) {
+      trailHead = (trailHead + 1) % MAX_TRAIL;
+      trailCount--;
+    } else break;
+  }
+}
+
+// Trail rendering — custom Points with per-particle alpha
+const trailGeo = new THREE.BufferGeometry();
+const trailPosAttr = new THREE.BufferAttribute(trailPositions, 3);
+trailPosAttr.setUsage(THREE.DynamicDrawUsage);
+trailGeo.setAttribute('position', trailPosAttr);
+
+const trailAlphaAttr = new THREE.BufferAttribute(trailAlphas, 1);
+trailAlphaAttr.setUsage(THREE.DynamicDrawUsage);
+trailGeo.setAttribute('alpha', trailAlphaAttr);
+
+const trailSizeAttr = new THREE.BufferAttribute(trailSizes, 1);
+trailSizeAttr.setUsage(THREE.DynamicDrawUsage);
+trailGeo.setAttribute('size', trailSizeAttr);
+
+const trailMat = new THREE.ShaderMaterial({
+  vertexShader: `
+    attribute float alpha;
+    attribute float size;
+    varying float vAlpha;
+    void main() {
+      vAlpha = alpha;
+      vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = size * (300.0 / -mvPos.z);
+      gl_Position = projectionMatrix * mvPos;
+    }
+  `,
+  fragmentShader: `
+    varying float vAlpha;
+    void main() {
+      float d = length(gl_PointCoord - 0.5) * 2.0;
+      if (d > 1.0) discard;
+      // Soft sparkle with bright core
+      float glow = exp(-d * 3.0);
+      float sparkle = pow(max(0.0, 1.0 - d), 8.0);
+      float a = (glow * 0.5 + sparkle * 0.8) * vAlpha;
+      vec3 col = mix(vec3(0.9, 0.85, 0.7), vec3(1.0, 1.0, 1.0), sparkle);
+      gl_FragColor = vec4(col, a);
+    }
+  `,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+
+const trailPoints = new THREE.Points(trailGeo, trailMat);
+scene.add(trailPoints);
+
+// ═══════════════════════════════════════════════
+// PHYSICS
+// ═══════════════════════════════════════════════
 let time = 0;
 
 function applyExternalForces(dt) {
   time += dt;
 
+  // Audio-reactive wind multiplier
+  const windMult = 1.0 + audioBands.bass * 1.5 + audioBands.subBass * 0.8;
+  // Audio-reactive displacement
+  const displace = audioBands.subBass * 0.15;
+
   for (let i = 0; i < numParticles; i++) {
     if (invMass[i] === 0) continue;
 
-    // Gravity — very gentle, mostly cancelled by updraft
     vel[i*3+1] += GRAVITY * dt * 0.02;
 
-    // Multi-frequency organic wind
     const px = pos[i*3], py = pos[i*3+1], pz = pos[i*3+2];
     const t = time;
 
-    // Large-scale billowing
-    const windX = (Math.sin(t * 0.3 + py * 2.0) * 0.15 +
-                   Math.sin(t * 0.7 + pz * 1.5) * 0.08) * 0.5;
-    const windY = (Math.cos(t * 0.25 + px * 1.8) * 0.1 +
-                   Math.sin(t * 0.5) * 0.05) * 0.5;
-    const windZ = (Math.sin(t * 0.4 + px * 2.2 + py * 1.3) * 0.2 +
-                   Math.cos(t * 0.15) * 0.15 +
-                   Math.sin(t * 0.8 + py * 3.0) * 0.06) * 0.5;
+    // Multi-frequency wind — modulated by audio
+    const windX = (Math.sin(t*0.3 + py*2.0)*0.15 + Math.sin(t*0.7 + pz*1.5)*0.08) * 0.5 * windMult;
+    const windY = (Math.cos(t*0.25 + px*1.8)*0.1 + Math.sin(t*0.5)*0.05) * 0.5 * windMult;
+    const windZ = (Math.sin(t*0.4 + px*2.2 + py*1.3)*0.2 + Math.cos(t*0.15)*0.15
+                  + Math.sin(t*0.8 + py*3.0)*0.06) * 0.5 * windMult;
 
     vel[i*3]   += windX * dt;
     vel[i*3+1] += windY * dt;
     vel[i*3+2] += windZ * dt;
+
+    // Audio: sub-bass displaces Z (breathing effect)
+    vel[i*3+2] += displace * Math.sin(t*2.0 + px*3.0 + py*3.0) * dt * 30;
+
+    // Audio: low-mid sway
+    vel[i*3] += audioBands.lowMid * Math.sin(t*1.5 + py*2.5) * dt * 8;
   }
 }
 
-// Air drag per triangle
 function applyAeroDrag(dt) {
-  for (let r = 0; r < ROWS - 1; r++) {
-    for (let c = 0; c < COLS - 1; c++) {
-      const i0 = idx(r, c), i1 = idx(r, c+1), i2 = idx(r+1, c);
+  for (let r = 0; r < ROWS-1; r++) {
+    for (let c = 0; c < COLS-1; c++) {
+      const i0 = idx(r,c), i1 = idx(r,c+1), i2 = idx(r+1,c);
       applyTriangleDrag(i0, i1, i2, dt);
-      const i3 = idx(r+1, c+1);
-      applyTriangleDrag(i1, i3, i2, dt);
+      applyTriangleDrag(i1, idx(r+1,c+1), i2, dt);
     }
   }
 }
 
 function applyTriangleDrag(i0, i1, i2, dt) {
-  // Average velocity of triangle
-  const vx = (vel[i0*3] + vel[i1*3] + vel[i2*3]) / 3;
-  const vy = (vel[i0*3+1] + vel[i1*3+1] + vel[i2*3+1]) / 3;
-  const vz = (vel[i0*3+2] + vel[i1*3+2] + vel[i2*3+2]) / 3;
+  const vx = (vel[i0*3]+vel[i1*3]+vel[i2*3])/3;
+  const vy = (vel[i0*3+1]+vel[i1*3+1]+vel[i2*3+1])/3;
+  const vz = (vel[i0*3+2]+vel[i1*3+2]+vel[i2*3+2])/3;
 
-  // Triangle normal
-  const e1x = pos[i1*3] - pos[i0*3];
-  const e1y = pos[i1*3+1] - pos[i0*3+1];
-  const e1z = pos[i1*3+2] - pos[i0*3+2];
-  const e2x = pos[i2*3] - pos[i0*3];
-  const e2y = pos[i2*3+1] - pos[i0*3+1];
-  const e2z = pos[i2*3+2] - pos[i0*3+2];
-
-  const nx = e1y*e2z - e1z*e2y;
-  const ny = e1z*e2x - e1x*e2z;
-  const nz = e1x*e2y - e1y*e2x;
-
-  const area = Math.sqrt(nx*nx + ny*ny + nz*nz) * 0.5;
+  const e1x=pos[i1*3]-pos[i0*3], e1y=pos[i1*3+1]-pos[i0*3+1], e1z=pos[i1*3+2]-pos[i0*3+2];
+  const e2x=pos[i2*3]-pos[i0*3], e2y=pos[i2*3+1]-pos[i0*3+1], e2z=pos[i2*3+2]-pos[i0*3+2];
+  const nx=e1y*e2z-e1z*e2y, ny=e1z*e2x-e1x*e2z, nz=e1x*e2y-e1y*e2x;
+  const area = Math.sqrt(nx*nx+ny*ny+nz*nz)*0.5;
   if (area < 1e-8) return;
+  const nnx=nx/(area*2), nny=ny/(area*2), nnz=nz/(area*2);
 
-  const nnx = nx / (area*2), nny = ny / (area*2), nnz = nz / (area*2);
-
-  // Project velocity onto normal
-  const vDotN = vx*nnx + vy*nny + vz*nnz;
-  const projArea = area * Math.abs(vDotN);
-
-  const speed = Math.sqrt(vx*vx + vy*vy + vz*vz);
+  const vDotN = vx*nnx+vy*nny+vz*nnz;
+  const speed = Math.sqrt(vx*vx+vy*vy+vz*vz);
   if (speed < 1e-8) return;
 
-  const dragMag = 0.5 * AIR_DENSITY * DRAG_COEFF * projArea * speed;
-  const fx = -dragMag * vx / speed / 3;
-  const fy = -dragMag * vy / speed / 3;
-  const fz = -dragMag * vz / speed / 3;
-
-  for (const i of [i0, i1, i2]) {
-    vel[i*3]   += fx * dt * invMass[i];
-    vel[i*3+1] += fy * dt * invMass[i];
-    vel[i*3+2] += fz * dt * invMass[i];
+  const dragMag = 0.5*AIR_DENSITY*DRAG_COEFF*area*Math.abs(vDotN)*speed;
+  const fx=-dragMag*vx/speed/3, fy=-dragMag*vy/speed/3, fz=-dragMag*vz/speed/3;
+  for (const i of [i0,i1,i2]) {
+    vel[i*3]+=fx*dt*invMass[i]; vel[i*3+1]+=fy*dt*invMass[i]; vel[i*3+2]+=fz*dt*invMass[i];
   }
 }
 
-// Soft centring to keep cloth in view
-function applyCentring() {
-  let cx = 0, cy = 0, cz = 0;
+// Return-to-rest spring — pulls cloth back to initial shape when undisturbed
+function applyRestReturn(dt) {
+  if (isDragging) return; // don't fight the user
+  const k = 0.08; // spring stiffness — gentle
   for (let i = 0; i < numParticles; i++) {
-    cx += pos[i*3]; cy += pos[i*3+1]; cz += pos[i*3+2];
+    if (invMass[i] === 0) continue;
+    const dx = restPos[i*3] - pos[i*3];
+    const dy = restPos[i*3+1] - pos[i*3+1];
+    const dz = restPos[i*3+2] - pos[i*3+2];
+    vel[i*3]   += dx * k * dt * 60;
+    vel[i*3+1] += dy * k * dt * 60;
+    vel[i*3+2] += dz * k * dt * 60;
   }
-  cx /= numParticles; cy /= numParticles; cz /= numParticles;
+}
 
+function applyCentring() {
+  let cx=0, cy=0, cz=0;
+  for (let i=0; i<numParticles; i++) { cx+=pos[i*3]; cy+=pos[i*3+1]; cz+=pos[i*3+2]; }
+  cx/=numParticles; cy/=numParticles; cz/=numParticles;
   const k = 0.003;
-  for (let i = 0; i < numParticles; i++) {
-    pos[i*3]   -= cx * k;
-    pos[i*3+1] -= cy * k;
-    pos[i*3+2] -= cz * k;
-    prevPos[i*3]   -= cx * k;
-    prevPos[i*3+1] -= cy * k;
-    prevPos[i*3+2] -= cz * k;
+  for (let i=0; i<numParticles; i++) {
+    pos[i*3]-=cx*k; pos[i*3+1]-=cy*k; pos[i*3+2]-=cz*k;
+    prevPos[i*3]-=cx*k; prevPos[i*3+1]-=cy*k; prevPos[i*3+2]-=cz*k;
   }
 }
 
 function simulate() {
-  const dt = 1 / 60 / SUBSTEPS;
-
+  const dt = 1/60/SUBSTEPS;
   for (let sub = 0; sub < SUBSTEPS; sub++) {
     applyExternalForces(dt);
     applyAeroDrag(dt);
+    applyRestReturn(dt);
 
-    // Predict positions
     for (let i = 0; i < numParticles; i++) {
       if (invMass[i] === 0) continue;
-      vel[i*3]   *= DAMPING;
-      vel[i*3+1] *= DAMPING;
-      vel[i*3+2] *= DAMPING;
-      prevPos[i*3]   = pos[i*3];
-      prevPos[i*3+1] = pos[i*3+1];
-      prevPos[i*3+2] = pos[i*3+2];
-      pos[i*3]   += vel[i*3] * dt;
-      pos[i*3+1] += vel[i*3+1] * dt;
-      pos[i*3+2] += vel[i*3+2] * dt;
+      vel[i*3]*=DAMPING; vel[i*3+1]*=DAMPING; vel[i*3+2]*=DAMPING;
+      prevPos[i*3]=pos[i*3]; prevPos[i*3+1]=pos[i*3+1]; prevPos[i*3+2]=pos[i*3+2];
+      pos[i*3]+=vel[i*3]*dt; pos[i*3+1]+=vel[i*3+1]*dt; pos[i*3+2]+=vel[i*3+2]*dt;
     }
 
-    // Solve constraints
     for (let iter = 0; iter < ITERATIONS; iter++) {
       for (const c of distConstraints) solveConstraint(c, STRETCH_COMPLIANCE, dt);
       for (const c of bendConstraints) solveConstraint(c, BEND_COMPLIANCE, dt);
     }
 
-    // Update velocities from position delta
     for (let i = 0; i < numParticles; i++) {
       if (invMass[i] === 0) continue;
-      vel[i*3]   = (pos[i*3]   - prevPos[i*3])   / dt;
-      vel[i*3+1] = (pos[i*3+1] - prevPos[i*3+1]) / dt;
-      vel[i*3+2] = (pos[i*3+2] - prevPos[i*3+2]) / dt;
+      vel[i*3]=(pos[i*3]-prevPos[i*3])/dt;
+      vel[i*3+1]=(pos[i*3+1]-prevPos[i*3+1])/dt;
+      vel[i*3+2]=(pos[i*3+2]-prevPos[i*3+2])/dt;
     }
   }
-
   applyCentring();
 }
 
 // ═══════════════════════════════════════════════
-// PROCEDURAL SHWESHWE TEXTURE (high-res)
+// PROCEDURAL SHWESHWE TEXTURE
 // ═══════════════════════════════════════════════
 const TEX_SIZE = 1024;
 
 function generateShweshweTexture() {
   const canvas = document.createElement('canvas');
-  canvas.width = TEX_SIZE;
-  canvas.height = TEX_SIZE;
+  canvas.width = TEX_SIZE; canvas.height = TEX_SIZE;
   const ctx = canvas.getContext('2d');
-
-  const pri = palette.primary;
-  const acc = palette.accent;
-  const mid = palette.mid;
-
+  const pri = palette.primary, acc = palette.accent, mid = palette.mid;
   const data = ctx.createImageData(TEX_SIZE, TEX_SIZE);
   const px = data.data;
 
   for (let y = 0; y < TEX_SIZE; y++) {
     for (let x = 0; x < TEX_SIZE; x++) {
-      const i = (y * TEX_SIZE + x) * 4;
-
-      // Multi-scale shweshwe pattern
-      const cellSize = 32; // pixels per repeat cell
-      const cx = x % cellSize;
-      const cy = y % cellSize;
-      const cellX = Math.floor(x / cellSize);
-      const cellY = Math.floor(y / cellSize);
-
-      // Checkerboard at cell level
-      const checker = (cellX + cellY) % 2 === 0;
-
-      // Normalised position within cell
-      const nx = cx / cellSize;
-      const ny = cy / cellSize;
-
-      // Diamond motif (centred in cell)
-      const diamond = Math.abs(nx - 0.5) + Math.abs(ny - 0.5);
-
-      // Concentric diamond rings
-      const ring1 = Math.abs(diamond - 0.2) < 0.04;
-      const ring2 = Math.abs(diamond - 0.35) < 0.03;
-
-      // Small dots at corners of each cell
-      const dotRadius = 0.08;
-      const dot = (nx < dotRadius && ny < dotRadius) ||
-                  (nx > 1 - dotRadius && ny < dotRadius) ||
-                  (nx < dotRadius && ny > 1 - dotRadius) ||
-                  (nx > 1 - dotRadius && ny > 1 - dotRadius);
-
-      // Cross motif
-      const cross = (Math.abs(nx - 0.5) < 0.03 && Math.abs(ny - 0.5) < 0.15) ||
-                    (Math.abs(ny - 0.5) < 0.03 && Math.abs(nx - 0.5) < 0.15);
-
-      // Fine grid lines
-      const gridLine = (cx % 4 === 0) || (cy % 4 === 0);
-
-      // Small sub-cell pattern — tiny diamonds
+      const i = (y*TEX_SIZE+x)*4;
+      const cellSize = 32;
+      const cx = x%cellSize, cy = y%cellSize;
+      const cellX = Math.floor(x/cellSize), cellY = Math.floor(y/cellSize);
+      const checker = (cellX+cellY)%2===0;
+      const nx = cx/cellSize, ny = cy/cellSize;
+      const diamond = Math.abs(nx-0.5)+Math.abs(ny-0.5);
+      const ring1 = Math.abs(diamond-0.2)<0.04;
+      const ring2 = Math.abs(diamond-0.35)<0.03;
+      const dotR = 0.08;
+      const dot = (nx<dotR&&ny<dotR)||(nx>1-dotR&&ny<dotR)||(nx<dotR&&ny>1-dotR)||(nx>1-dotR&&ny>1-dotR);
+      const cross = (Math.abs(nx-0.5)<0.03&&Math.abs(ny-0.5)<0.15)||(Math.abs(ny-0.5)<0.03&&Math.abs(nx-0.5)<0.15);
+      const gridLine = (cx%4===0)||(cy%4===0);
       const subCell = 8;
-      const scx = (x % subCell) / subCell;
-      const scy = (y % subCell) / subCell;
-      const microDiamond = Math.abs(scx - 0.5) + Math.abs(scy - 0.5) < 0.25;
+      const scx = (x%subCell)/subCell, scy = (y%subCell)/subCell;
+      const microDiamond = Math.abs(scx-0.5)+Math.abs(scy-0.5)<0.25;
 
       let col;
       if (checker) {
-        // Primary cell
-        col = [...pri];
-        if (ring1 || ring2) {
-          col = [...acc];
-        } else if (diamond < 0.15) {
-          // Centre diamond filled
-          col = [acc[0]*0.95, acc[1]*0.95, acc[2]*0.95];
-        } else if (dot) {
-          col = [...acc];
-        } else if (cross && diamond > 0.25) {
-          col = [mid[0]*1.2, mid[1]*1.2, mid[2]*1.2];
-        } else if (microDiamond && !gridLine) {
-          col = [pri[0]*1.1, pri[1]*1.1, pri[2]*1.1];
-        } else if (gridLine) {
-          col = [pri[0]*0.85, pri[1]*0.85, pri[2]*0.85];
-        }
+        col=[...pri];
+        if (ring1||ring2) col=[...acc];
+        else if (diamond<0.15) col=[acc[0]*0.95,acc[1]*0.95,acc[2]*0.95];
+        else if (dot) col=[...acc];
+        else if (cross&&diamond>0.25) col=[mid[0]*1.2,mid[1]*1.2,mid[2]*1.2];
+        else if (microDiamond&&!gridLine) col=[pri[0]*1.1,pri[1]*1.1,pri[2]*1.1];
+        else if (gridLine) col=[pri[0]*0.85,pri[1]*0.85,pri[2]*0.85];
       } else {
-        // Accent cell
-        col = [...acc];
-        if (ring1) {
-          col = [...pri];
-        } else if (diamond < 0.12) {
-          col = [...pri];
-        } else if (dot) {
-          col = [...mid];
-        } else if (gridLine) {
-          col = [acc[0]*0.92, acc[1]*0.92, acc[2]*0.92];
-        } else if (microDiamond) {
-          col = [acc[0]*0.96, acc[1]*0.96, acc[2]*0.96];
-        }
+        col=[...acc];
+        if (ring1) col=[...pri];
+        else if (diamond<0.12) col=[...pri];
+        else if (dot) col=[...mid];
+        else if (gridLine) col=[acc[0]*0.92,acc[1]*0.92,acc[2]*0.92];
+        else if (microDiamond) col=[acc[0]*0.96,acc[1]*0.96,acc[2]*0.96];
       }
 
-      // Subtle thread noise — simulates weave texture
-      const noise = (Math.sin(x * 47.3 + y * 31.7) * 0.5 + 0.5) * 0.03 - 0.015;
-
-      px[i]     = Math.min(255, Math.max(0, (col[0] + noise) * 255));
-      px[i + 1] = Math.min(255, Math.max(0, (col[1] + noise) * 255));
-      px[i + 2] = Math.min(255, Math.max(0, (col[2] + noise) * 255));
-      px[i + 3] = 255;
+      const noise = (Math.sin(x*47.3+y*31.7)*0.5+0.5)*0.03-0.015;
+      px[i]=Math.min(255,Math.max(0,(col[0]+noise)*255));
+      px[i+1]=Math.min(255,Math.max(0,(col[1]+noise)*255));
+      px[i+2]=Math.min(255,Math.max(0,(col[2]+noise)*255));
+      px[i+3]=255;
     }
   }
-
   ctx.putImageData(data, 0, 0);
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -455,46 +742,28 @@ function generateShweshweTexture() {
   return tex;
 }
 
-// Normal map from weave pattern
 function generateWeaveNormalMap() {
   const size = 512;
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
   const data = ctx.createImageData(size, size);
   const px = data.data;
-
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const i = (y * size + x) * 4;
-      // Weave pattern — interlocking horizontal/vertical bumps
-      const warpBump = Math.sin(x * Math.PI * 2 / 4) * Math.cos(y * Math.PI / 8);
-      const weftBump = Math.sin(y * Math.PI * 2 / 4) * Math.cos(x * Math.PI / 8);
-
-      // Determine which yarn is on top (plain weave)
-      const cellX = Math.floor(x / 4);
-      const cellY = Math.floor(y / 4);
-      const onTop = (cellX + cellY) % 2 === 0;
-
-      const bump = onTop ? warpBump * 0.5 : weftBump * 0.5;
-
-      // Finite differences for normal
+      const i = (y*size+x)*4;
+      const cellX = Math.floor(x/4), cellY = Math.floor(y/4);
+      const onTop = (cellX+cellY)%2===0;
       const scale = 0.8;
-      const nx = onTop ?
-        Math.cos(x * Math.PI * 2 / 4) * Math.cos(y * Math.PI / 8) * scale :
-        -Math.sin(y * Math.PI * 2 / 4) * Math.sin(x * Math.PI / 8) * scale * 0.3;
-      const ny = onTop ?
-        Math.sin(x * Math.PI * 2 / 4) * (-Math.sin(y * Math.PI / 8)) * scale * 0.3 :
-        Math.cos(y * Math.PI * 2 / 4) * Math.cos(x * Math.PI / 8) * scale;
-
-      px[i]     = Math.min(255, Math.max(0, (nx * 0.5 + 0.5) * 255));
-      px[i + 1] = Math.min(255, Math.max(0, (ny * 0.5 + 0.5) * 255));
-      px[i + 2] = 200; // z-component (mostly up)
-      px[i + 3] = 255;
+      const nx = onTop ? Math.cos(x*Math.PI*2/4)*Math.cos(y*Math.PI/8)*scale :
+        -Math.sin(y*Math.PI*2/4)*Math.sin(x*Math.PI/8)*scale*0.3;
+      const ny = onTop ? Math.sin(x*Math.PI*2/4)*(-Math.sin(y*Math.PI/8))*scale*0.3 :
+        Math.cos(y*Math.PI*2/4)*Math.cos(x*Math.PI/8)*scale;
+      px[i]=Math.min(255,Math.max(0,(nx*0.5+0.5)*255));
+      px[i+1]=Math.min(255,Math.max(0,(ny*0.5+0.5)*255));
+      px[i+2]=200; px[i+3]=255;
     }
   }
-
   ctx.putImageData(data, 0, 0);
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -504,7 +773,7 @@ function generateWeaveNormalMap() {
 }
 
 // ═══════════════════════════════════════════════
-// CUSTOM FABRIC SHADER
+// FABRIC SHADER — with audio-reactive uniforms
 // ═══════════════════════════════════════════════
 
 const fabricVertexShader = `
@@ -513,7 +782,6 @@ varying vec3 vWorldPos;
 varying vec2 vUv;
 varying vec3 vTangent;
 varying vec3 vBitangent;
-
 attribute vec3 tangent_attr;
 
 void main() {
@@ -521,11 +789,8 @@ void main() {
   vNormal = normalize(normalMatrix * normal);
   vec4 worldPos = modelMatrix * vec4(position, 1.0);
   vWorldPos = worldPos.xyz;
-
-  // Compute tangent/bitangent for anisotropic shading
   vTangent = normalize(normalMatrix * tangent_attr);
   vBitangent = cross(vNormal, vTangent);
-
   gl_Position = projectionMatrix * viewMatrix * worldPos;
 }
 `;
@@ -541,6 +806,9 @@ uniform vec3 u_lightCol1;
 uniform vec3 u_lightCol2;
 uniform vec3 u_cameraPos;
 uniform float u_time;
+uniform float u_audioSheen;    // highs → sheen intensity
+uniform float u_audioWarmth;   // mids → colour warmth
+uniform float u_audioSparkle;  // high-mids → sparkle
 
 varying vec3 vNormal;
 varying vec3 vWorldPos;
@@ -548,23 +816,28 @@ varying vec2 vUv;
 varying vec3 vTangent;
 varying vec3 vBitangent;
 
-// Anisotropic specular — Kajiya-Kay model for fabric
-float anisoSpec(vec3 T, vec3 H, float exp) {
+float anisoSpec(vec3 T, vec3 H, float e) {
   float TdotH = dot(T, H);
   float sinTH = sqrt(max(0.0, 1.0 - TdotH * TdotH));
-  return pow(sinTH, exp);
+  return pow(sinTH, e);
 }
 
-// Fresnel-Schlick
 float fresnel(float cosTheta, float f0) {
   return f0 + (1.0 - f0) * pow(1.0 - cosTheta, 5.0);
 }
 
+// Simple hash for sparkle
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
 void main() {
-  // Sample textures
   vec4 diffuseTex = texture2D(u_diffuseMap, vUv);
 
-  // Normal mapping
+  // Audio warmth — shift towards warm tones
+  vec3 warmShift = vec3(0.08, 0.03, -0.02) * u_audioWarmth;
+  diffuseTex.rgb += warmShift;
+
   vec3 normalMapVal = texture2D(u_normalMap, vUv).xyz * 2.0 - 1.0;
   mat3 TBN = mat3(normalize(vTangent), normalize(vBitangent), normalize(vNormal));
   vec3 N = normalize(TBN * normalMapVal);
@@ -572,13 +845,11 @@ void main() {
   vec3 V = normalize(u_cameraPos - vWorldPos);
   float NdotV = max(dot(N, V), 0.0);
 
-  // Warp tangent (along U) and weft tangent (along V)
   vec3 warpT = normalize(vTangent);
   vec3 weftT = normalize(vBitangent);
 
   vec3 color = vec3(0.0);
 
-  // Two-light setup
   vec3 lights[2];
   vec3 lightCols[2];
   lights[0] = normalize(u_lightDir1);
@@ -589,23 +860,19 @@ void main() {
   for (int l = 0; l < 2; l++) {
     vec3 L = lights[l];
     vec3 H = normalize(L + V);
-    float NdotL = max(dot(N, L), 0.0);
 
-    // Diffuse — wrap lighting for soft fabric look
     float wrap = 0.35;
     float diffuse = max(0.0, (dot(N, L) + wrap) / (1.0 + wrap));
 
-    // Dual anisotropic specular — warp and weft highlights
     float specWarp = anisoSpec(warpT, H, 40.0) * 0.35;
     float specWeft = anisoSpec(weftT, H, 30.0) * 0.25;
 
-    // Fresnel
     float F = fresnel(NdotV, 0.04);
 
-    // Sheen — for fabric edge brightness (velvet/cotton effect)
-    float sheen = pow(1.0 - NdotV, 3.0) * 0.15;
+    // Sheen — boosted by audio highs
+    float sheenBase = 0.15 + u_audioSheen * 0.35;
+    float sheen = pow(1.0 - NdotV, 3.0) * sheenBase;
 
-    // Subsurface translucency — light through thin fabric
     float translucency = max(0.0, dot(V, -L)) * 0.12;
     vec3 transCol = diffuseTex.rgb * vec3(1.2, 0.9, 0.8);
 
@@ -620,14 +887,25 @@ void main() {
   // Ambient
   color += diffuseTex.rgb * vec3(0.04, 0.05, 0.07);
 
-  // Subtle rim glow
+  // Rim glow
   float rim = pow(1.0 - NdotV, 4.0);
   color += rim * vec3(0.05, 0.08, 0.12);
 
-  // Back-face darkening
-  if (!gl_FrontFacing) {
-    color *= 0.6;
+  // Audio sparkle — glitter dots on surface
+  if (u_audioSparkle > 0.05) {
+    vec2 sparkleUV = floor(vUv * 200.0);
+    float sparkleVal = hash(sparkleUV + floor(u_time * 3.0));
+    float threshold = 1.0 - u_audioSparkle * 0.3; // more energy = more sparkles
+    if (sparkleVal > threshold) {
+      float intensity = (sparkleVal - threshold) / (1.0 - threshold);
+      // View-dependent sparkle
+      float sparkleAngle = hash(sparkleUV * 1.7);
+      float viewFactor = pow(abs(sin(sparkleAngle * 6.28 + dot(V, N) * 3.0)), 4.0);
+      color += vec3(1.0, 0.95, 0.85) * intensity * viewFactor * u_audioSparkle * 0.6;
+    }
   }
+
+  if (!gl_FrontFacing) color *= 0.6;
 
   gl_FragColor = vec4(color, 1.0);
 }
@@ -636,101 +914,70 @@ void main() {
 // ═══════════════════════════════════════════════
 // MESH SETUP
 // ═══════════════════════════════════════════════
-
-// Create geometry
 const geometry = new THREE.BufferGeometry();
 
-// Indices
 const indices = [];
-for (let r = 0; r < ROWS - 1; r++) {
-  for (let c = 0; c < COLS - 1; c++) {
+for (let r = 0; r < ROWS-1; r++) {
+  for (let c = 0; c < COLS-1; c++) {
     const i = idx(r, c);
-    indices.push(i, idx(r, c+1), idx(r+1, c));
-    indices.push(idx(r, c+1), idx(r+1, c+1), idx(r+1, c));
+    indices.push(i, idx(r,c+1), idx(r+1,c));
+    indices.push(idx(r,c+1), idx(r+1,c+1), idx(r+1,c));
   }
 }
 geometry.setIndex(indices);
 
-// Position attribute
 const posAttr = new THREE.BufferAttribute(pos, 3);
 posAttr.setUsage(THREE.DynamicDrawUsage);
 geometry.setAttribute('position', posAttr);
 
-// UVs
 const uvs = new Float32Array(numParticles * 2);
 for (let r = 0; r < ROWS; r++) {
   for (let c = 0; c < COLS; c++) {
     const i = idx(r, c);
-    uvs[i * 2] = c / (COLS - 1);
-    uvs[i * 2 + 1] = r / (ROWS - 1);
+    uvs[i*2] = c/(COLS-1); uvs[i*2+1] = r/(ROWS-1);
   }
 }
 geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
 
-// Normals
 const normals = new Float32Array(numParticles * 3);
 geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
 
-// Tangents for anisotropic shading
 const tangents = new Float32Array(numParticles * 3);
 geometry.setAttribute('tangent_attr', new THREE.BufferAttribute(tangents, 3));
 
 function updateNormals() {
   const norms = geometry.attributes.normal.array;
   const tangs = geometry.attributes.tangent_attr.array;
-  norms.fill(0);
-  tangs.fill(0);
+  norms.fill(0); tangs.fill(0);
 
-  for (let r = 0; r < ROWS - 1; r++) {
-    for (let c = 0; c < COLS - 1; c++) {
-      const i0 = idx(r, c), i1 = idx(r, c+1), i2 = idx(r+1, c);
-
-      const e1x = pos[i1*3] - pos[i0*3];
-      const e1y = pos[i1*3+1] - pos[i0*3+1];
-      const e1z = pos[i1*3+2] - pos[i0*3+2];
-      const e2x = pos[i2*3] - pos[i0*3];
-      const e2y = pos[i2*3+1] - pos[i0*3+1];
-      const e2z = pos[i2*3+2] - pos[i0*3+2];
-
-      const nx = e1y*e2z - e1z*e2y;
-      const ny = e1z*e2x - e1x*e2z;
-      const nz = e1x*e2y - e1y*e2x;
-
-      for (const i of [i0, i1, i2]) {
-        norms[i*3] += nx;
-        norms[i*3+1] += ny;
-        norms[i*3+2] += nz;
-      }
+  for (let r = 0; r < ROWS-1; r++) {
+    for (let c = 0; c < COLS-1; c++) {
+      const i0 = idx(r,c), i1 = idx(r,c+1), i2 = idx(r+1,c);
+      const e1x=pos[i1*3]-pos[i0*3], e1y=pos[i1*3+1]-pos[i0*3+1], e1z=pos[i1*3+2]-pos[i0*3+2];
+      const e2x=pos[i2*3]-pos[i0*3], e2y=pos[i2*3+1]-pos[i0*3+1], e2z=pos[i2*3+2]-pos[i0*3+2];
+      const nx=e1y*e2z-e1z*e2y, ny=e1z*e2x-e1x*e2z, nz=e1x*e2y-e1y*e2x;
+      for (const i of [i0,i1,i2]) { norms[i*3]+=nx; norms[i*3+1]+=ny; norms[i*3+2]+=nz; }
     }
   }
 
   for (let i = 0; i < numParticles; i++) {
-    const len = Math.sqrt(norms[i*3]**2 + norms[i*3+1]**2 + norms[i*3+2]**2) || 1;
-    norms[i*3] /= len;
-    norms[i*3+1] /= len;
-    norms[i*3+2] /= len;
+    const len = Math.sqrt(norms[i*3]**2+norms[i*3+1]**2+norms[i*3+2]**2)||1;
+    norms[i*3]/=len; norms[i*3+1]/=len; norms[i*3+2]/=len;
   }
 
-  // Compute tangents (along U direction — warp)
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const i = idx(r, c);
       let tx, ty, tz;
-      if (c < COLS - 1) {
-        const j = idx(r, c + 1);
-        tx = pos[j*3] - pos[i*3];
-        ty = pos[j*3+1] - pos[i*3+1];
-        tz = pos[j*3+2] - pos[i*3+2];
+      if (c < COLS-1) {
+        const j = idx(r,c+1);
+        tx=pos[j*3]-pos[i*3]; ty=pos[j*3+1]-pos[i*3+1]; tz=pos[j*3+2]-pos[i*3+2];
       } else {
-        const j = idx(r, c - 1);
-        tx = pos[i*3] - pos[j*3];
-        ty = pos[i*3+1] - pos[j*3+1];
-        tz = pos[i*3+2] - pos[j*3+2];
+        const j = idx(r,c-1);
+        tx=pos[i*3]-pos[j*3]; ty=pos[i*3+1]-pos[j*3+1]; tz=pos[i*3+2]-pos[j*3+2];
       }
-      const tl = Math.sqrt(tx*tx + ty*ty + tz*tz) || 1;
-      tangs[i*3] = tx/tl;
-      tangs[i*3+1] = ty/tl;
-      tangs[i*3+2] = tz/tl;
+      const tl = Math.sqrt(tx*tx+ty*ty+tz*tz)||1;
+      tangs[i*3]=tx/tl; tangs[i*3+1]=ty/tl; tangs[i*3+2]=tz/tl;
     }
   }
 
@@ -738,7 +985,6 @@ function updateNormals() {
   geometry.attributes.tangent_attr.needsUpdate = true;
 }
 
-// Textures
 let diffuseMap = generateShweshweTexture();
 let normalMap = generateWeaveNormalMap();
 
@@ -754,6 +1000,9 @@ const material = new THREE.ShaderMaterial({
     u_lightCol2: { value: new THREE.Vector3(0.3, 0.35, 0.5) },
     u_cameraPos: { value: new THREE.Vector3() },
     u_time: { value: 0 },
+    u_audioSheen: { value: 0 },
+    u_audioWarmth: { value: 0 },
+    u_audioSparkle: { value: 0 },
   },
   side: THREE.DoubleSide,
 });
@@ -762,101 +1011,96 @@ const mesh = new THREE.Mesh(geometry, material);
 scene.add(mesh);
 
 // ═══════════════════════════════════════════════
-// ENVIRONMENT
+// AMBIENT PARTICLES
 // ═══════════════════════════════════════════════
-
-// Subtle ambient particles
-const particleCount = 200;
-const particleGeo = new THREE.BufferGeometry();
-const particlePositions = new Float32Array(particleCount * 3);
-for (let i = 0; i < particleCount; i++) {
-  particlePositions[i*3] = (Math.random() - 0.5) * 10;
-  particlePositions[i*3+1] = (Math.random() - 0.5) * 10;
-  particlePositions[i*3+2] = (Math.random() - 0.5) * 10;
+const ambientCount = 200;
+const ambientGeo = new THREE.BufferGeometry();
+const ambientPositions = new Float32Array(ambientCount * 3);
+for (let i = 0; i < ambientCount; i++) {
+  ambientPositions[i*3]=(Math.random()-0.5)*10;
+  ambientPositions[i*3+1]=(Math.random()-0.5)*10;
+  ambientPositions[i*3+2]=(Math.random()-0.5)*10;
 }
-particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-
-const particleMat = new THREE.PointsMaterial({
-  color: 0xffffff,
-  size: 0.008,
-  transparent: true,
-  opacity: 0.15,
-  sizeAttenuation: true,
+ambientGeo.setAttribute('position', new THREE.BufferAttribute(ambientPositions, 3));
+const ambientMat = new THREE.PointsMaterial({
+  color: 0xffffff, size: 0.008, transparent: true, opacity: 0.15, sizeAttenuation: true,
 });
-const particles = new THREE.Points(particleGeo, particleMat);
-scene.add(particles);
+const ambientParticles = new THREE.Points(ambientGeo, ambientMat);
+scene.add(ambientParticles);
 
 // ═══════════════════════════════════════════════
 // PALETTE SWITCHING
 // ═══════════════════════════════════════════════
-
 function switchPalette() {
-  paletteIdx = (paletteIdx + 1) % PALETTES.length;
+  paletteIdx = (paletteIdx+1) % PALETTES.length;
   palette = PALETTES[paletteIdx];
-
-  // Regenerate texture
   if (diffuseMap) diffuseMap.dispose();
   diffuseMap = generateShweshweTexture();
   material.uniforms.u_diffuseMap.value = diffuseMap;
-
-  // Show name
   const el = document.getElementById('palette-name');
   el.textContent = palette.name;
   el.style.opacity = '1';
   setTimeout(() => { el.style.opacity = '0'; }, 2000);
 }
 
-window.addEventListener('click', switchPalette);
-// Show initial palette
 document.getElementById('palette-name').textContent = palette.name;
 
 // ═══════════════════════════════════════════════
 // ANIMATION LOOP
 // ═══════════════════════════════════════════════
-
 const clock = new THREE.Clock();
 
 function animate() {
   requestAnimationFrame(animate);
-
+  const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.getElapsedTime();
 
-  // Simulate physics
+  // Audio update
+  updateAudio(dt);
+
+  // Physics
   simulate();
 
   // Update geometry
   geometry.attributes.position.needsUpdate = true;
   updateNormals();
 
-  // Camera — slow orbit, always looking at centre
-  const camRadius = 4.5;
+  // Update trail
+  updateTrail(dt);
+  trailGeo.attributes.position.needsUpdate = true;
+  trailGeo.attributes.alpha.needsUpdate = true;
+  trailGeo.setDrawRange(0, trailCount);
+
+  // Camera — slow orbit
+  const camRadius = 5.0;
   const camSpeed = 0.12;
+  // Audio: bass slightly pushes camera distance
+  const audioCamPush = audioBands.bass * 0.3;
   camera.position.set(
-    Math.sin(t * camSpeed) * camRadius,
-    Math.sin(t * camSpeed * 0.7) * 0.8 + 0.3,
-    Math.cos(t * camSpeed) * camRadius
+    Math.sin(t*camSpeed) * (camRadius + audioCamPush),
+    Math.sin(t*camSpeed*0.7) * 0.8 + 0.3,
+    Math.cos(t*camSpeed) * (camRadius + audioCamPush)
   );
   camera.lookAt(0, 0, 0);
 
   // Update uniforms
   material.uniforms.u_cameraPos.value.copy(camera.position);
   material.uniforms.u_time.value = t;
+  material.uniforms.u_audioSheen.value = audioBands.high;
+  material.uniforms.u_audioWarmth.value = audioBands.mid;
+  material.uniforms.u_audioSparkle.value = audioBands.highMid;
 
-  // Animate lights gently
+  // Animate lights
   const l1 = material.uniforms.u_lightDir1.value;
-  l1.set(
-    0.6 + Math.sin(t * 0.2) * 0.3,
-    0.8,
-    0.5 + Math.cos(t * 0.15) * 0.3
-  ).normalize();
+  l1.set(0.6+Math.sin(t*0.2)*0.3, 0.8, 0.5+Math.cos(t*0.15)*0.3).normalize();
 
-  // Drift particles
-  const pp = particles.geometry.attributes.position.array;
-  for (let i = 0; i < particleCount; i++) {
+  // Drift ambient particles
+  const pp = ambientParticles.geometry.attributes.position.array;
+  for (let i = 0; i < ambientCount; i++) {
     pp[i*3+1] += 0.001;
     if (pp[i*3+1] > 5) pp[i*3+1] = -5;
   }
-  particles.geometry.attributes.position.needsUpdate = true;
+  ambientParticles.geometry.attributes.position.needsUpdate = true;
 
   renderer.render(scene, camera);
 }
