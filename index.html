@@ -5,8 +5,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SA Shweshwe — Cloth Simulation</title>
 <style>
+  :root {
+    --bg: #060608;
+    --fg: #ffffff;
+    --fg10: #ffffff15;
+    --fg20: #ffffff25;
+    --fg30: #ffffff40;
+    --fg50: #ffffff50;
+    --fg70: #ffffff80;
+    --btn-bg: #ffffff08;
+    --btn-border: #ffffff15;
+    --panel-bg: #0a0c12ee;
+    --accent: #00ffd5;
+  }
+  html.light {
+    --bg: #f0ede8;
+    --fg: #1a1a1e;
+    --fg10: #1a1a1e12;
+    --fg20: #1a1a1e20;
+    --fg30: #1a1a1e35;
+    --fg50: #1a1a1e55;
+    --fg70: #1a1a1e80;
+    --btn-bg: #1a1a1e08;
+    --btn-border: #1a1a1e18;
+    --panel-bg: #e8e5e0ee;
+    --accent: #007a66;
+  }
   * { margin: 0; padding: 0; }
-  body { background: #060608; overflow: hidden; cursor: crosshair; }
+  body { background: var(--bg); overflow: hidden; cursor: crosshair; transition: background 0s; }
   canvas { display: block; }
   #info {
     position: fixed;
@@ -15,7 +41,7 @@
     transform: translateX(-50%);
     font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 0.65rem;
-    color: #ffffff25;
+    color: var(--fg20);
     letter-spacing: 0.15em;
     text-transform: uppercase;
     pointer-events: none;
@@ -24,10 +50,10 @@
   #palette-name {
     position: fixed;
     top: 1.5rem;
-    right: 2rem;
+    right: 6rem;
     font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 0.7rem;
-    color: #ffffff40;
+    color: var(--fg30);
     letter-spacing: 0.2em;
     text-transform: uppercase;
     pointer-events: none;
@@ -39,37 +65,65 @@
     top: 1.5rem;
     font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 0.65rem;
-    color: #ffffff50;
+    color: var(--fg50);
     letter-spacing: 0.15em;
     text-transform: uppercase;
-    background: #ffffff08;
-    border: 1px solid #ffffff15;
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
     padding: 0.5rem 1rem;
     cursor: pointer;
     z-index: 10;
     transition: all 0.3s;
   }
-  .ctrl-btn:hover { background: #ffffff15; color: #ffffffa0; }
-  .ctrl-btn.active { color: #00ffd580; border-color: #00ffd530; }
+  .ctrl-btn:hover { background: var(--fg10); color: var(--fg70); }
+  .ctrl-btn.active { color: var(--accent); border-color: var(--accent); opacity: 0.7; }
   #music-btn { left: 2rem; }
   #mic-btn { left: 10rem; }
   #dev-btn { left: 17rem; }
+
+  /* THEME TOGGLE */
+  #theme-btn {
+    position: fixed;
+    top: 1.5rem;
+    right: 2rem;
+    width: 36px; height: 36px;
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    border-radius: 50%;
+    cursor: pointer;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background 0.3s, border-color 0.3s;
+  }
+  #theme-btn:hover { background: var(--fg10); }
+  #theme-btn svg { width: 18px; height: 18px; }
+
+  /* CLOTH WIPE OVERLAY */
+  #cloth-wipe {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+  }
 
   /* DEV PANEL */
   #dev-panel {
     position: fixed;
     top: 0; right: 0;
-    width: 340px;
+    width: 380px;
     height: 100vh;
-    background: #0a0c12ee;
-    border-left: 1px solid #ffffff12;
+    background: var(--panel-bg);
+    border-left: 1px solid var(--fg10);
     z-index: 200;
     transform: translateX(100%);
     transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     overflow-y: auto;
     font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 0.6rem;
-    color: #ffffff80;
+    font-size: 0.78rem;
+    color: var(--fg70);
     padding: 1rem 1.2rem 6rem;
     box-sizing: border-box;
     scrollbar-width: thin;
@@ -78,13 +132,14 @@
   }
   #dev-panel.open { transform: translateX(0); }
   #dev-panel h3 {
-    font-size: 0.6rem;
+    font-size: 0.78rem;
     letter-spacing: 0.2em;
     text-transform: uppercase;
-    color: #00ffd560;
+    color: var(--accent);
+    opacity: 0.5;
     margin: 1.2rem 0 0.5rem;
     padding-bottom: 0.3rem;
-    border-bottom: 1px solid #ffffff0a;
+    border-bottom: 1px solid var(--fg10);
   }
   #dev-panel h3:first-child { margin-top: 0.3rem; }
   .p-row {
@@ -99,15 +154,15 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: #ffffff50;
-    font-size: 0.58rem;
+    color: var(--fg50);
+    font-size: 0.75rem;
   }
   .p-row input[type=range] {
     flex: 1;
     height: 3px;
     -webkit-appearance: none;
     appearance: none;
-    background: #ffffff15;
+    background: var(--fg10);
     border-radius: 2px;
     outline: none;
   }
@@ -115,33 +170,33 @@
     -webkit-appearance: none;
     width: 10px; height: 10px;
     border-radius: 50%;
-    background: #00ffd5;
+    background: var(--accent);
     cursor: pointer;
   }
   .p-row .p-val {
     flex: 0 0 48px;
     width: 48px;
     text-align: right;
-    color: #ffffff70;
-    font-size: 0.55rem;
-    background: #ffffff08;
-    border: 1px solid #ffffff10;
+    color: var(--fg70);
+    font-size: 0.72rem;
+    background: var(--btn-bg);
+    border: 1px solid var(--fg10);
     border-radius: 3px;
     padding: 1px 4px;
     font-family: inherit;
     outline: none;
     -moz-appearance: textfield;
   }
-  .p-row .p-val:focus { border-color: #00ffd540; color: #ffffffa0; }
+  .p-row .p-val:focus { border-color: var(--accent); opacity: 0.7; color: var(--fg70); }
   .p-row .p-val::-webkit-inner-spin-button,
   .p-row .p-val::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   .p-revert {
     flex: 0 0 14px;
     width: 14px; height: 14px;
     background: none;
-    border: 1px solid #ffffff12;
+    border: 1px solid var(--fg10);
     border-radius: 3px;
-    color: #ffffff30;
+    color: var(--fg20);
     font-size: 0.5rem;
     cursor: pointer;
     display: flex;
@@ -158,19 +213,19 @@
     width: 100%;
     margin-top: 0.5rem;
     padding: 0.6rem;
-    background: #ffffff08;
-    border: 1px solid #ffffff15;
-    color: #ffffff60;
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    color: var(--fg50);
     font-family: inherit;
-    font-size: 0.6rem;
+    font-size: 0.78rem;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     cursor: pointer;
     transition: all 0.3s;
   }
-  .snap-btn:hover { background: #ffffff15; color: #ffffffa0; }
-  .snap-btn.primary { background: #00ffd510; border-color: #00ffd530; color: #00ffd580; }
-  .snap-btn.primary:hover { background: #00ffd520; color: #00ffd5c0; }
+  .snap-btn:hover { background: var(--fg10); color: var(--fg70); }
+  .snap-btn.primary { background: color-mix(in srgb, var(--accent) 8%, transparent); border-color: var(--accent); opacity: 0.6; color: var(--accent); }
+  .snap-btn.primary:hover { opacity: 0.9; }
   .snap-btn.danger { border-color: #ff6b4a20; color: #ff6b4a60; }
   .snap-btn.danger:hover { background: #ff6b4a15; color: #ff6b4a90; }
   #snapshot-list {
@@ -181,55 +236,56 @@
     align-items: center;
     gap: 0.4rem;
     padding: 0.4rem 0;
-    border-bottom: 1px solid #ffffff08;
-    font-size: 0.52rem;
+    border-bottom: 1px solid var(--fg10);
+    font-size: 0.68rem;
   }
   .snap-item .snap-name {
     flex: 1;
-    color: #ffffff60;
+    color: var(--fg50);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .snap-item .snap-time {
-    color: #ffffff25;
-    font-size: 0.48rem;
+    color: var(--fg20);
+    font-size: 0.62rem;
     flex: 0 0 auto;
   }
   .snap-item button {
     flex: 0 0 auto;
     background: none;
-    border: 1px solid #ffffff12;
+    border: 1px solid var(--fg10);
     border-radius: 3px;
-    color: #ffffff40;
+    color: var(--fg30);
     font-family: inherit;
-    font-size: 0.48rem;
+    font-size: 0.62rem;
     padding: 2px 6px;
     cursor: pointer;
     transition: all 0.2s;
   }
-  .snap-item button:hover { border-color: #00ffd530; color: #00ffd580; }
-  .snap-item button.snap-del:hover { border-color: #ff6b4a40; color: #ff6b4a80; }
+  .snap-item button:hover { border-color: var(--accent); color: var(--accent); opacity: 0.7; }
+  .snap-item button.snap-del:hover { border-color: #ff6b4a40; color: #ff6b4a80; opacity: 1; }
   #copy-json {
     display: block;
     width: 100%;
     margin-top: 1rem;
     padding: 0.6rem;
-    background: #00ffd510;
-    border: 1px solid #00ffd530;
-    color: #00ffd580;
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    opacity: 0.6;
     font-family: inherit;
-    font-size: 0.6rem;
+    font-size: 0.78rem;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     cursor: pointer;
     transition: all 0.3s;
   }
-  #copy-json:hover { background: #00ffd520; color: #00ffd5c0; }
-  #copy-json.copied { color: #ffffff; background: #00ffd540; }
+  #copy-json:hover { opacity: 0.9; }
+  #copy-json.copied { color: var(--fg); opacity: 1; }
   .p-tip {
-    font-size: 0.48rem;
-    color: #ffffff28;
+    font-size: 0.62rem;
+    color: var(--fg20);
     margin: -0.1rem 0 0.3rem 0;
     padding-left: 2px;
     line-height: 1.3;
@@ -237,13 +293,13 @@
   .band-meter {
     flex: 0 0 30px;
     height: 3px;
-    background: #ffffff10;
+    background: var(--fg10);
     border-radius: 2px;
     overflow: hidden;
   }
   .band-meter-fill {
     height: 100%;
-    background: #00ffd5;
+    background: var(--accent);
     transition: width 0.05s;
     border-radius: 2px;
   }
@@ -255,6 +311,15 @@
 <button class="ctrl-btn" id="music-btn">&#9654; music</button>
 <button class="ctrl-btn" id="mic-btn">mic off</button>
 <button class="ctrl-btn" id="dev-btn">dev</button>
+<button id="theme-btn" title="Toggle light/dark mode">
+  <svg id="theme-icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--fg50)">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+  </svg>
+  <svg id="theme-icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--fg50);display:none">
+    <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+  </svg>
+</button>
+<svg id="cloth-wipe" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
 <div id="dev-panel"></div>
 
 <script type="importmap">
@@ -274,60 +339,60 @@ import * as THREE from 'three';
 // ═══════════════════════════════════════════════
 const P = {
   // Physics
-  substeps: 8,
-  iterations: 2,
-  gravity: -0.8,
-  damping: 0.998,
-  stretchCompliance: 0.0,
-  bendCompliance: 0.0001,
-  airDensity: 1.2,
-  dragCoeff: 0.04,
+  substeps: 10,
+  iterations: 3,
+  gravity: -0.05,
+  damping: 1,
+  stretchCompliance: 0,
+  bendCompliance: 0.0016,
+  airDensity: 0,
+  dragCoeff: 0.015,
   gravityDtMult: 0.02,
 
   // Wind
-  windMultBase: 1.0,
-  windMultBass: 2.0,
-  windMultSubBass: 1.2,
-  displaceSubBass: 0.25,
-  breathingMult: 40,
-  swayMult: 12,
+  windMultBase: 0.5,
+  windMultBass: 4.7,
+  windMultSubBass: 2,
+  displaceSubBass: 0.44,
+  breathingMult: 32,
+  swayMult: 0,
 
   // Ripple
-  rippleSpeed: 2.5,
-  rippleFreq: 7.0,
-  rippleDecay: 2.5,
-  rippleSpatialDecay: 1.5,
-  rippleAmplitude: 0.12,
-  rippleImpulse: 8.0,
+  rippleSpeed: 5,
+  rippleFreq: 1,
+  rippleDecay: 2.4,
+  rippleSpatialDecay: 3.5,
+  rippleAmplitude: 0.22,
+  rippleImpulse: 27.5,
 
   // Drag
-  grabRadius: 8,
-  maxDragDisplacement: 0.04,
-  dragLerp: 0.35,
-  maxThrowSpeed: 15,
-  throwMultiplier: 20,
+  grabRadius: 10,
+  maxDragDisplacement: 0.06,
+  dragLerp: 0.3,
+  maxThrowSpeed: 23,
+  throwMultiplier: 26,
 
   // Rest Return
-  restReturnMinK: 0.04,
-  restReturnMaxK: 0.25,
-  restReturnRamp: 0.08,
-  velClampSpeed: 8.0,
-  centringK: 0.003,
+  restReturnMinK: 0,
+  restReturnMaxK: 0.15,
+  restReturnRamp: 0.145,
+  velClampSpeed: 1,
+  centringK: 0.007,
 
   // Camera
-  camRadius: 5.0,
-  camSpeed: 0.12,
-  camAudioPush: 0.3,
-  camVertAmp: 0.8,
-  camVertOffset: 0.3,
+  camRadius: 5.9,
+  camSpeed: 0.16,
+  camAudioPush: 0.65,
+  camVertAmp: 0.3,
+  camVertOffset: 0.9,
 
   // Audio
-  audioSmoothing: 0.7,
-  musicVolume: 0.5,
+  audioSmoothing: 0.75,
+  musicVolume: 0.6,
 
   // Trail
-  trailFadeRate: 0.4,
-  trailDrift: 0.015,
+  trailFadeRate: 0.05,
+  trailDrift: 0,
 
   // Lighting
   light1X: 0.6,
@@ -425,7 +490,41 @@ const devPanel = document.getElementById('dev-panel');
 const devBtn = document.getElementById('dev-btn');
 const sliderEls = {};
 const valEls = {};
+const revertEls = {};
 const bandMeterEls = {};
+
+// Store defaults for revert
+const DEFAULTS = JSON.parse(JSON.stringify(P));
+
+// Snapshot storage key
+const SNAP_KEY = 'shweshwe-cloth-snapshots';
+
+function getDecimals(step) {
+  return step < 0.001 ? 4 : step < 0.01 ? 3 : step < 1 ? 2 : 0;
+}
+
+function applyValue(key, v) {
+  P[key] = v;
+  if (key === 'musicVolume' && musicAudio) musicAudio.volume = v;
+  if (key === 'audioSmoothing' && analyser) analyser.smoothingTimeConstant = v;
+  // Mark revert button if changed from default
+  const rb = revertEls[key];
+  if (rb) rb.classList.toggle('changed', v !== DEFAULTS[key]);
+}
+
+function syncUI(key, v) {
+  // Find the param def to get step for decimals
+  let step = 0.01;
+  for (const params of Object.values(PARAM_DEFS)) {
+    const found = params.find(p => p.key === key);
+    if (found) { step = found.step; break; }
+  }
+  const decimals = getDecimals(step);
+  if (sliderEls[key]) sliderEls[key].value = v;
+  if (valEls[key]) valEls[key].value = v.toFixed(decimals);
+  const rb = revertEls[key];
+  if (rb) rb.classList.toggle('changed', v !== DEFAULTS[key]);
+}
 
 function buildDevPanel() {
   let html = '';
@@ -433,11 +532,13 @@ function buildDevPanel() {
     html += `<h3>${section}</h3>`;
     for (const { key, min, max, step, tip } of params) {
       const val = P[key];
-      const decimals = step < 0.001 ? 4 : step < 0.01 ? 3 : step < 1 ? 2 : 0;
+      const decimals = getDecimals(step);
+      const changed = val !== DEFAULTS[key];
       html += `<div class="p-row">
         <label title="${key}">${key}</label>
         <input type="range" id="sl_${key}" min="${min}" max="${max}" step="${step}" value="${val}">
-        <span class="p-val" id="vl_${key}">${val.toFixed(decimals)}</span>
+        <input type="number" class="p-val" id="vl_${key}" value="${val.toFixed(decimals)}" step="${step}" min="${min}" max="${max}">
+        <button class="p-revert${changed ? ' changed' : ''}" id="rv_${key}" title="Revert to default (${DEFAULTS[key]})">&#8634;</button>
       </div>`;
       if (tip) html += `<div class="p-tip">${tip}</div>`;
     }
@@ -450,11 +551,19 @@ function buildDevPanel() {
     html += `<div class="p-row">
       <label>${b}</label>
       <div class="band-meter"><div class="band-meter-fill" id="bm_${b}" style="width:0%"></div></div>
-      <span class="p-val" id="bv_${b}">0.00</span>
+      <input type="number" class="p-val" id="bv_${b}" value="0.00" readonly tabindex="-1" style="opacity:0.5;pointer-events:none;">
     </div>`;
   }
 
-  html += '<button id="copy-json">Copy JSON</button>';
+  // Action buttons
+  html += '<h3>Snapshots</h3>';
+  html += '<button class="snap-btn primary" id="randomise">Randomise</button>';
+  html += '<button class="snap-btn danger" id="reset-cloth">Reset Cloth</button>';
+  html += '<button class="snap-btn primary" id="save-snapshot">Save Snapshot</button>';
+  html += '<button class="snap-btn" id="revert-all">Revert All to Defaults</button>';
+  html += '<button class="snap-btn primary" id="copy-json">Copy JSON</button>';
+  html += '<div id="snapshot-list"></div>';
+
   devPanel.innerHTML = html;
 
   // Cache elements and wire events
@@ -462,16 +571,47 @@ function buildDevPanel() {
     for (const { key, step } of params) {
       const sl = document.getElementById(`sl_${key}`);
       const vl = document.getElementById(`vl_${key}`);
+      const rv = document.getElementById(`rv_${key}`);
       sliderEls[key] = sl;
       valEls[key] = vl;
-      const decimals = step < 0.001 ? 4 : step < 0.01 ? 3 : step < 1 ? 2 : 0;
+      revertEls[key] = rv;
+      const decimals = getDecimals(step);
+
+      // Slider → value
       sl.addEventListener('input', () => {
         const v = parseFloat(sl.value);
-        P[key] = v;
-        vl.textContent = v.toFixed(decimals);
-        // Live-apply specific params that need immediate effect
-        if (key === 'musicVolume' && musicAudio) musicAudio.volume = v;
-        if (key === 'audioSmoothing' && analyser) analyser.smoothingTimeConstant = v;
+        vl.value = v.toFixed(decimals);
+        applyValue(key, v);
+      });
+
+      // Number input → slider + value
+      vl.addEventListener('input', () => {
+        const v = parseFloat(vl.value);
+        if (isNaN(v)) return;
+        sl.value = v;
+        applyValue(key, v);
+      });
+      // On blur, clamp and format
+      vl.addEventListener('blur', () => {
+        let v = parseFloat(vl.value);
+        if (isNaN(v)) v = DEFAULTS[key];
+        vl.value = v.toFixed(decimals);
+        sl.value = v;
+        applyValue(key, v);
+      });
+      // Enter key confirms
+      vl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { vl.blur(); e.preventDefault(); }
+      });
+
+      // Revert button
+      rv.addEventListener('click', () => {
+        const def = DEFAULTS[key];
+        P[key] = def;
+        sl.value = def;
+        vl.value = def.toFixed(decimals);
+        rv.classList.remove('changed');
+        applyValue(key, def);
       });
     }
   }
@@ -480,15 +620,144 @@ function buildDevPanel() {
     bandMeterEls[b] = document.getElementById(`bm_${b}`);
   }
 
+  // Copy JSON
   document.getElementById('copy-json').addEventListener('click', function() {
     const json = JSON.stringify(P, null, 2);
     navigator.clipboard.writeText(json).then(() => {
-      this.classList.add('copied');
+      const orig = this.textContent;
       this.textContent = 'Copied!';
-      setTimeout(() => { this.classList.remove('copied'); this.textContent = 'Copy JSON'; }, 1500);
+      this.style.color = '#ffffff';
+      setTimeout(() => { this.textContent = orig; this.style.color = ''; }, 1500);
+    });
+  });
+
+  // Revert all
+  document.getElementById('revert-all').addEventListener('click', () => {
+    for (const key in DEFAULTS) {
+      P[key] = DEFAULTS[key];
+      syncUI(key, DEFAULTS[key]);
+      applyValue(key, DEFAULTS[key]);
+    }
+  });
+
+  // Reset cloth — teleport all particles back to rest, zero velocities
+  document.getElementById('reset-cloth').addEventListener('click', () => {
+    resetClothState();
+  });
+
+  // Randomise — biased toward sensible values using gaussian-ish distribution
+  document.getElementById('randomise').addEventListener('click', () => {
+    // Helper: random between min/max, biased toward the default (bell curve around it)
+    function biasedRandom(min, max, def, step) {
+      // 70% of the time: gaussian around default within ±50% of range
+      // 30% of the time: uniform across full range (for exploration)
+      const range = max - min;
+      let v;
+      if (Math.random() < 0.7) {
+        // Box-Muller gaussian, sigma = 25% of range
+        const u1 = Math.random(), u2 = Math.random();
+        const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        v = def + z * range * 0.25;
+      } else {
+        v = min + Math.random() * range;
+      }
+      // Clamp to range
+      v = Math.max(min, Math.min(max, v));
+      // Snap to step
+      if (step > 0) v = Math.round(v / step) * step;
+      return v;
+    }
+
+    for (const [, params] of Object.entries(PARAM_DEFS)) {
+      for (const { key, min, max, step } of params) {
+        const v = biasedRandom(min, max, DEFAULTS[key], step);
+        P[key] = v;
+        syncUI(key, v);
+        applyValue(key, v);
+      }
+    }
+  });
+
+  // Save snapshot
+  document.getElementById('save-snapshot').addEventListener('click', () => {
+    const name = prompt('Snapshot name:', `Snapshot ${new Date().toLocaleString('en-ZA')}`);
+    if (!name) return;
+    const snapshots = JSON.parse(localStorage.getItem(SNAP_KEY) || '[]');
+    snapshots.unshift({
+      name,
+      time: Date.now(),
+      params: JSON.parse(JSON.stringify(P)),
+    });
+    // Keep max 50 snapshots
+    if (snapshots.length > 50) snapshots.length = 50;
+    localStorage.setItem(SNAP_KEY, JSON.stringify(snapshots));
+    renderSnapshots();
+  });
+
+  renderSnapshots();
+}
+
+function renderSnapshots() {
+  const container = document.getElementById('snapshot-list');
+  if (!container) return;
+  const snapshots = JSON.parse(localStorage.getItem(SNAP_KEY) || '[]');
+  if (snapshots.length === 0) {
+    container.innerHTML = '<div style="color:#ffffff20;font-size:0.62rem;padding:0.5rem 0;">No snapshots saved yet</div>';
+    return;
+  }
+  let html = '';
+  for (let i = 0; i < snapshots.length; i++) {
+    const s = snapshots[i];
+    const date = new Date(s.time);
+    const timeStr = date.toLocaleString('en-ZA', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+    html += `<div class="snap-item">
+      <span class="snap-name" title="${s.name}">${s.name}</span>
+      <span class="snap-time">${timeStr}</span>
+      <button data-snap-load="${i}">Load</button>
+      <button data-snap-copy="${i}">JSON</button>
+      <button class="snap-del" data-snap-del="${i}">&#10005;</button>
+    </div>`;
+  }
+  container.innerHTML = html;
+
+  // Wire snapshot buttons
+  container.querySelectorAll('[data-snap-load]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.snapLoad);
+      const snap = snapshots[idx];
+      if (!snap) return;
+      for (const key in snap.params) {
+        if (key in P) {
+          P[key] = snap.params[key];
+          syncUI(key, snap.params[key]);
+          applyValue(key, snap.params[key]);
+        }
+      }
+    });
+  });
+
+  container.querySelectorAll('[data-snap-copy]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.snapCopy);
+      const snap = snapshots[idx];
+      if (!snap) return;
+      navigator.clipboard.writeText(JSON.stringify(snap.params, null, 2)).then(() => {
+        btn.textContent = 'OK';
+        setTimeout(() => { btn.textContent = 'JSON'; }, 1000);
+      });
+    });
+  });
+
+  container.querySelectorAll('[data-snap-del]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.snapDel);
+      snapshots.splice(idx, 1);
+      localStorage.setItem(SNAP_KEY, JSON.stringify(snapshots));
+      renderSnapshots();
     });
   });
 }
+
 buildDevPanel();
 
 devBtn.addEventListener('click', (e) => {
@@ -507,9 +776,155 @@ function updateBandMeters() {
     const v = audioBands[b];
     if (bandMeterEls[b]) bandMeterEls[b].style.width = `${Math.min(100, v * 100)}%`;
     const bv = document.getElementById(`bv_${b}`);
-    if (bv) bv.textContent = v.toFixed(2);
+    if (bv) bv.value = v.toFixed(2);
   }
 }
+
+// ═══════════════════════════════════════════════
+// THEME TOGGLE — cloth wipe SVG animation
+// ═══════════════════════════════════════════════
+let isDark = true;
+let wipeAnimating = false;
+
+const themeBtn = document.getElementById('theme-btn');
+const clothWipeSvg = document.getElementById('cloth-wipe');
+const iconDark = document.getElementById('theme-icon-dark');
+const iconLight = document.getElementById('theme-icon-light');
+
+// Generate a wavy cloth-edge path with undulating folds
+function clothEdgePath(xPercent, amplitude, segments, seed) {
+  const points = [];
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const y = t * 100;
+    // Multi-frequency wave for natural cloth drape
+    const wave = Math.sin(t * Math.PI * 3 + seed) * amplitude
+               + Math.sin(t * Math.PI * 7 + seed * 2.3) * amplitude * 0.4
+               + Math.sin(t * Math.PI * 13 + seed * 0.7) * amplitude * 0.15;
+    points.push({ x: xPercent + wave, y });
+  }
+  // Build SVG path
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const cur = points[i];
+    const cpY = (prev.y + cur.y) / 2;
+    d += ` C ${prev.x} ${cpY}, ${cur.x} ${cpY}, ${cur.x} ${cur.y}`;
+  }
+  return d;
+}
+
+function runClothWipe(toLight) {
+  if (wipeAnimating) return;
+  wipeAnimating = true;
+
+  const targetColour = toLight ? '#f0ede8' : '#060608';
+  const seed = Math.random() * 10;
+  const duration = 900;
+  const fps = 60;
+  const totalFrames = Math.ceil(duration / (1000 / fps));
+  const segments = 40;
+  const amplitude = 8;
+
+  // Create the wipe rectangle + wavy clip path
+  const ns = 'http://www.w3.org/2000/svg';
+  clothWipeSvg.innerHTML = '';
+
+  const defs = document.createElementNS(ns, 'defs');
+  const clipPath = document.createElementNS(ns, 'clipPath');
+  clipPath.id = 'wipe-clip';
+  const clipPathEl = document.createElementNS(ns, 'path');
+  clipPath.appendChild(clipPathEl);
+  defs.appendChild(clipPath);
+  clothWipeSvg.appendChild(defs);
+
+  const rect = document.createElementNS(ns, 'rect');
+  rect.setAttribute('width', '100');
+  rect.setAttribute('height', '100');
+  rect.setAttribute('fill', targetColour);
+  rect.setAttribute('clip-path', 'url(#wipe-clip)');
+  clothWipeSvg.appendChild(rect);
+
+  // Cloth-fold shadow line for depth
+  const shadowPath = document.createElementNS(ns, 'path');
+  shadowPath.setAttribute('fill', 'none');
+  shadowPath.setAttribute('stroke', toLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.04)');
+  shadowPath.setAttribute('stroke-width', '0.8');
+  clothWipeSvg.appendChild(shadowPath);
+
+  let frame = 0;
+  const direction = toLight ? 1 : -1; // L→R for light, R→L for dark
+
+  function animate() {
+    frame++;
+    const progress = frame / totalFrames;
+    // Ease: cubic in-out
+    const ease = progress < 0.5
+      ? 4 * progress * progress * progress
+      : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+    let edgeX;
+    if (direction === 1) {
+      // Left to right
+      edgeX = -15 + ease * 130; // overshoot past 100
+    } else {
+      // Right to left
+      edgeX = 115 - ease * 130;
+    }
+
+    // Animate the wave seed for rippling cloth motion
+    const animSeed = seed + progress * 4;
+    const edgePath = clothEdgePath(edgeX, amplitude * (1 - Math.abs(ease - 0.5) * 1.2), segments, animSeed);
+
+    // Build clip region: everything on the "filled" side of the wavy edge
+    let clipD;
+    if (direction === 1) {
+      clipD = `M -5 0 L -5 100 ${edgePath} L -5 0 Z`;
+    } else {
+      clipD = `M 105 0 L 105 100 ${edgePath} L 105 0 Z`;
+    }
+    clipPathEl.setAttribute('d', clipD);
+    shadowPath.setAttribute('d', edgePath);
+
+    if (frame < totalFrames) {
+      requestAnimationFrame(animate);
+    } else {
+      // Apply the actual theme
+      if (toLight) {
+        document.documentElement.classList.add('light');
+      } else {
+        document.documentElement.classList.remove('light');
+      }
+      isDark = !toLight;
+
+      // Update Three.js scene
+      updateSceneTheme();
+
+      // Swap icons
+      iconDark.style.display = toLight ? 'none' : 'block';
+      iconLight.style.display = toLight ? 'block' : 'none';
+
+      // Fade out wipe overlay
+      clothWipeSvg.style.transition = 'opacity 0.3s';
+      clothWipeSvg.style.opacity = '0';
+      setTimeout(() => {
+        clothWipeSvg.innerHTML = '';
+        clothWipeSvg.style.transition = '';
+        clothWipeSvg.style.opacity = '1';
+        wipeAnimating = false;
+      }, 300);
+    }
+  }
+  requestAnimationFrame(animate);
+}
+
+// Will be set after Three.js scene is created
+let updateSceneTheme = () => {};
+
+themeBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  runClothWipe(isDark); // if currently dark, wipe to light
+});
 
 // ═══════════════════════════════════════════════
 // CONFIG (non-tunable)
@@ -726,10 +1141,14 @@ renderer.toneMappingExposure = 1.1;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x060608);
+const DARK_BG = new THREE.Color(0x060608);
+const LIGHT_BG = new THREE.Color(0xf0ede8);
+scene.background = DARK_BG.clone();
 scene.fog = new THREE.FogExp2(0x060608, 0.12);
 
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 100);
+
+// updateSceneTheme is fully defined after ambientMat is created below
 
 // ═══════════════════════════════════════════════
 // XPBD CLOTH SOLVER
@@ -1111,6 +1530,25 @@ function applyCentring() {
   }
 }
 
+function resetClothState() {
+  for (let i = 0; i < numParticles; i++) {
+    pos[i*3]     = restPos[i*3];
+    pos[i*3+1]   = restPos[i*3+1];
+    pos[i*3+2]   = restPos[i*3+2];
+    prevPos[i*3]   = restPos[i*3];
+    prevPos[i*3+1] = restPos[i*3+1];
+    prevPos[i*3+2] = restPos[i*3+2];
+    vel[i*3] = 0; vel[i*3+1] = 0; vel[i*3+2] = 0;
+    invMass[i] = 1.0;
+  }
+  ripples.length = 0;
+  grabbed = -1;
+  isDragging = false;
+  dragMoved = false;
+  grabInfluence.clear();
+  releaseTime = time;
+}
+
 function simulate() {
   const dt = 1/60/P.substeps;
   for (let sub = 0; sub < P.substeps; sub++) {
@@ -1278,8 +1716,17 @@ const mesh=new THREE.Mesh(geometry,material);scene.add(mesh);
 const aC=200;const aG=new THREE.BufferGeometry();const aP=new Float32Array(aC*3);
 for(let i=0;i<aC;i++){aP[i*3]=(Math.random()-0.5)*10;aP[i*3+1]=(Math.random()-0.5)*10;aP[i*3+2]=(Math.random()-0.5)*10;}
 aG.setAttribute('position',new THREE.BufferAttribute(aP,3));
-const ambientPts=new THREE.Points(aG,new THREE.PointsMaterial({color:0xffffff,size:0.008,transparent:true,opacity:0.15,sizeAttenuation:true}));
+const ambientMat=new THREE.PointsMaterial({color:0xffffff,size:0.008,transparent:true,opacity:0.15,sizeAttenuation:true});
+const ambientPts=new THREE.Points(aG,ambientMat);
 scene.add(ambientPts);
+
+// Now that ambientMat exists, upgrade the theme updater
+updateSceneTheme = function() {
+  const bg = isDark ? DARK_BG : LIGHT_BG;
+  scene.background.copy(bg);
+  scene.fog.color.copy(bg);
+  ambientMat.color.set(isDark ? 0xffffff : 0x1a1a1e);
+};
 
 // ═══════════════════════════════════════════════
 // PALETTE
