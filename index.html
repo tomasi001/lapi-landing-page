@@ -3,11 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SA Shweshwe — Cloth Simulation</title>
+<title>lappie.ai — Cloth Simulation</title>
 <style>
   * { margin: 0; padding: 0; }
-  body { background: #060608; overflow: hidden; cursor: crosshair; }
+  body { background: #edecea; overflow: hidden; cursor: crosshair; }
   canvas { display: block; }
+  #logo {
+    position: fixed;
+    top: 1.5rem;
+    left: 2rem;
+    z-index: 10;
+    pointer-events: none;
+  }
+  #logo img {
+    height: 1.4rem;
+    width: auto;
+  }
   #info {
     position: fixed;
     bottom: 1.5rem;
@@ -15,7 +26,7 @@
     transform: translateX(-50%);
     font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 0.65rem;
-    color: #ffffff25;
+    color: #00000030;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     pointer-events: none;
@@ -23,11 +34,11 @@
   }
   #palette-name {
     position: fixed;
-    top: 1.5rem;
+    top: 4rem;
     right: 2rem;
     font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 0.7rem;
-    color: #ffffff40;
+    color: #00000045;
     letter-spacing: 0.2em;
     text-transform: uppercase;
     pointer-events: none;
@@ -39,23 +50,24 @@
     top: 1.5rem;
     font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 0.65rem;
-    color: #ffffff50;
+    color: #00000055;
     letter-spacing: 0.15em;
     text-transform: uppercase;
-    background: #ffffff08;
-    border: 1px solid #ffffff15;
+    background: #00000008;
+    border: 1px solid #00000015;
     padding: 0.5rem 1rem;
     cursor: pointer;
     z-index: 10;
     transition: all 0.3s;
   }
-  .ctrl-btn:hover { background: #ffffff15; color: #ffffffa0; }
-  .ctrl-btn.active { color: #00ffd580; border-color: #00ffd530; }
-  #music-btn { left: 2rem; }
-  #mic-btn { left: 10rem; }
+  .ctrl-btn:hover { background: #00000012; color: #000000a0; }
+  .ctrl-btn.active { color: #94201a; border-color: #94201a60; }
+  #mic-btn { right: 2rem; }
+  #music-btn { right: 9.5rem; }
 </style>
 </head>
 <body>
+<div id="logo"><img src="lappie logo.svg" alt="lappie.ai"></div>
 <div id="info">click: ripple + palette &middot; drag: pull cloth &middot; music auto-plays</div>
 <div id="palette-name"></div>
 <button class="ctrl-btn" id="music-btn">&#9654; music</button>
@@ -292,14 +304,16 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.3;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x060608);
-scene.fog = new THREE.FogExp2(0x060608, 0.12);
+scene.background = new THREE.Color(0xedecea);
+scene.fog = new THREE.FogExp2(0xedecea, 0.018);
 
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 100);
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 200);
 
 // ═══════════════════════════════════════════════
 // XPBD CLOTH SOLVER
@@ -598,9 +612,9 @@ const trailMat = new THREE.ShaderMaterial({
   `,
   fragmentShader: `
     varying float vAlpha;
-    void main() { float d=length(gl_PointCoord-0.5)*2.0; if(d>1.0)discard; float g=exp(-d*3.0); float s=pow(max(0.0,1.0-d),8.0); float a=(g*0.5+s*0.8)*vAlpha; gl_FragColor=vec4(mix(vec3(0.9,0.85,0.7),vec3(1),s),a); }
+    void main() { float d=length(gl_PointCoord-0.5)*2.0; if(d>1.0)discard; float g=exp(-d*3.0); float s=pow(max(0.0,1.0-d),8.0); float a=(g*0.5+s*0.8)*vAlpha; gl_FragColor=vec4(mix(vec3(0.6,0.55,0.45),vec3(0.85,0.8,0.7),s),a); }
   `,
-  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  transparent: true, depthWrite: false, blending: THREE.NormalBlending,
 });
 scene.add(new THREE.Points(trailGeo, trailMat));
 
@@ -805,7 +819,7 @@ void main(){
     float tr=max(0.,dot(V,-L[l]))*0.12;
     color+=LC[l]*(dTex.rgb*diff*0.85+(sW+sF)*F*LC[l]+sh*dTex.rgb*1.5+dTex.rgb*vec3(1.2,0.9,0.8)*tr);
   }
-  color+=dTex.rgb*vec3(0.04,0.05,0.07)+pow(1.-NdV,4.)*vec3(0.05,0.08,0.12);
+  color+=dTex.rgb*vec3(0.12,0.13,0.15)+pow(1.-NdV,4.)*vec3(0.08,0.10,0.14);
   if(u_audioSparkle>0.05){vec2 sUV=floor(vUv*200.);float sv=hash(sUV+floor(u_time*3.));float th=1.-u_audioSparkle*0.3;
   if(sv>th){float in2=(sv-th)/(1.-th);float sa=hash(sUV*1.7);float vf=pow(abs(sin(sa*6.28+dot(V,N)*3.)),4.);
   color+=vec3(1,.95,.85)*in2*vf*u_audioSparkle*0.6;}}
@@ -851,7 +865,7 @@ const material=new THREE.ShaderMaterial({
   vertexShader:fabricVS, fragmentShader:fabricFS,
   uniforms:{u_diffuseMap:{value:diffuseMap},u_normalMap:{value:normalMap},
     u_lightDir1:{value:new THREE.Vector3(0.6,0.8,0.5).normalize()},u_lightDir2:{value:new THREE.Vector3(-0.5,0.3,-0.8).normalize()},
-    u_lightCol1:{value:new THREE.Vector3(1,0.95,0.9)},u_lightCol2:{value:new THREE.Vector3(0.3,0.35,0.5)},
+    u_lightCol1:{value:new THREE.Vector3(1.2,1.15,1.1)},u_lightCol2:{value:new THREE.Vector3(0.5,0.55,0.65)},
     u_cameraPos:{value:new THREE.Vector3()},u_time:{value:0},u_audioSheen:{value:0},u_audioWarmth:{value:0},u_audioSparkle:{value:0}},
   side:THREE.DoubleSide,
 });
@@ -861,8 +875,52 @@ const mesh=new THREE.Mesh(geometry,material);scene.add(mesh);
 const aC=200;const aG=new THREE.BufferGeometry();const aP=new Float32Array(aC*3);
 for(let i=0;i<aC;i++){aP[i*3]=(Math.random()-0.5)*10;aP[i*3+1]=(Math.random()-0.5)*10;aP[i*3+2]=(Math.random()-0.5)*10;}
 aG.setAttribute('position',new THREE.BufferAttribute(aP,3));
-const ambientPts=new THREE.Points(aG,new THREE.PointsMaterial({color:0xffffff,size:0.008,transparent:true,opacity:0.15,sizeAttenuation:true}));
+const ambientPts=new THREE.Points(aG,new THREE.PointsMaterial({color:0x999999,size:0.008,transparent:true,opacity:0.12,sizeAttenuation:true}));
 scene.add(ambientPts);
+
+// ═══════════════════════════════════════════════
+// ENVIRONMENT — ground plane + directional shadow + lighting
+// ═══════════════════════════════════════════════
+
+// Ground plane — simple, clean, like a Unity default scene
+const groundGeo = new THREE.PlaneGeometry(200, 200);
+const groundMat = new THREE.MeshStandardMaterial({
+  color: 0xedecea,
+  roughness: 0.95,
+  metalness: 0.0,
+});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -2.8;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Ambient light — soft fill everywhere
+const ambientLight = new THREE.AmbientLight(0xedecea, 0.6);
+scene.add(ambientLight);
+
+// Directional light — main shadow-casting light
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+dirLight.position.set(4, 10, 6);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 2048;
+dirLight.shadow.mapSize.height = 2048;
+dirLight.shadow.camera.near = 0.5;
+dirLight.shadow.camera.far = 40;
+dirLight.shadow.camera.left = -8;
+dirLight.shadow.camera.right = 8;
+dirLight.shadow.camera.top = 8;
+dirLight.shadow.camera.bottom = -8;
+dirLight.shadow.bias = -0.001;
+dirLight.shadow.radius = 4;
+scene.add(dirLight);
+
+// Hemisphere light — sky/ground color gradient for natural feel
+const hemiLight = new THREE.HemisphereLight(0xf0f0f0, 0xd0cfc8, 0.4);
+scene.add(hemiLight);
+
+// Enable shadow casting on the cloth mesh
+mesh.castShadow = true;
 
 // ═══════════════════════════════════════════════
 // PALETTE
@@ -894,9 +952,8 @@ function animate(){
   trailGeo.attributes.alpha.needsUpdate=true;
   trailGeo.setDrawRange(0,trailCount);
 
-  const camR=5.0,camS=0.12,aCP=audioBands.bass*0.3;
-  camera.position.set(Math.sin(t*camS)*(camR+aCP),Math.sin(t*camS*0.7)*0.8+0.3,Math.cos(t*camS)*(camR+aCP));
-  camera.lookAt(0,0,0);
+  camera.position.set(0, 1.2, 5.5);
+  camera.lookAt(0, -0.3, 0);
 
   material.uniforms.u_cameraPos.value.copy(camera.position);
   material.uniforms.u_time.value=t;
