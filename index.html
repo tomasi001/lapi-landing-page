@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SA Shweshwe — Cloth Simulation</title>
+<style>
+  * { margin: 0; padding: 0; }
+  body { background: #060608; overflow: hidden; cursor: crosshair; }
+  canvas { display: block; }
+  #info {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.7rem;
+    color: #ffffff30;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #palette-name {
+    position: fixed;
+    top: 1.5rem;
+    right: 2rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.7rem;
+    color: #ffffff40;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 10;
+    transition: opacity 0.5s;
+  }
+</style>
+</head>
+<body>
+<div id="info">click to change palette</div>
+<div id="palette-name"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.172.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ═══════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════
+const COLS = 120;
+const ROWS = 90;
+const SPACING = 0.045;
+const SUBSTEPS = 8;
+const ITERATIONS = 2; // per substep
+const GRAVITY = -0.8;
+const DAMPING = 0.998;
+const STRETCH_COMPLIANCE = 0.0;      // inextensible
+const BEND_COMPLIANCE = 0.0001;      // soft bending — flowing fabric
+const AIR_DENSITY = 1.2;
+const DRAG_COEFF = 0.04;
+const CLOTH_THICKNESS = 0.005;
+
+// SA Shweshwe palettes
+const PALETTES = [
+  { name: 'Indigo Shweshwe',  primary: [0.12, 0.22, 0.55], accent: [0.94, 0.92, 0.86], mid: [0.08, 0.15, 0.40] },
+  { name: 'Ochre Earth',      primary: [0.60, 0.30, 0.10], accent: [0.95, 0.90, 0.80], mid: [0.45, 0.22, 0.08] },
+  { name: 'Umhlanga Green',   primary: [0.08, 0.38, 0.22], accent: [0.92, 0.92, 0.85], mid: [0.05, 0.28, 0.15] },
+  { name: 'Madiba Black',     primary: [0.08, 0.08, 0.10], accent: [0.90, 0.88, 0.83], mid: [0.15, 0.15, 0.17] },
+  { name: 'Cape Blue',        primary: [0.08, 0.30, 0.62], accent: [0.93, 0.91, 0.86], mid: [0.06, 0.22, 0.48] },
+  { name: 'Karoo Red',        primary: [0.58, 0.12, 0.10], accent: [0.94, 0.91, 0.85], mid: [0.42, 0.08, 0.07] },
+];
+
+let paletteIdx = 0;
+let palette = PALETTES[0];
+
+// ═══════════════════════════════════════════════
+// THREE.JS SETUP
+// ═══════════════════════════════════════════════
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x060608);
+scene.fog = new THREE.FogExp2(0x060608, 0.15);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 100);
+camera.position.set(0, 0, 5);
+
+// ═══════════════════════════════════════════════
+// XPBD CLOTH SOLVER
+// ═══════════════════════════════════════════════
+const numParticles = COLS * ROWS;
+const pos = new Float32Array(numParticles * 3);
+const prevPos = new Float32Array(numParticles * 3);
+const vel = new Float32Array(numParticles * 3);
+const invMass = new Float32Array(numParticles);
+
+// Constraints
+const distConstraints = [];
+const bendConstraints = [];
+
+function idx(r, c) { return r * COLS + c; }
+
+// Initialise grid — centred, lying flat in XY plane with slight initial wave
+for (let r = 0; r < ROWS; r++) {
+  for (let c = 0; c < COLS; c++) {
+    const i = idx(r, c);
+    const x = (c - (COLS - 1) / 2) * SPACING;
+    const y = (r - (ROWS - 1) / 2) * SPACING;
+    const z = Math.sin(c * 0.08 + r * 0.06) * 0.08;
+
+    pos[i * 3] = x;
+    pos[i * 3 + 1] = y;
+    pos[i * 3 + 2] = z;
+    prevPos[i * 3] = x;
+    prevPos[i * 3 + 1] = y;
+    prevPos[i * 3 + 2] = z;
+
+    invMass[i] = 1.0;
+  }
+}
+
+// Distance constraints (edges)
+function addDist(i0, i1) {
+  const dx = pos[i0*3] - pos[i1*3];
+  const dy = pos[i0*3+1] - pos[i1*3+1];
+  const dz = pos[i0*3+2] - pos[i1*3+2];
+  const restLen = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  distConstraints.push({ i0, i1, restLen });
+}
+
+// Bending constraints (pairs of triangles sharing an edge)
+function addBend(i0, i1, i2, i3) {
+  // i0-i1 is the shared edge, i2 and i3 are the opposite vertices
+  const dx = pos[i2*3] - pos[i3*3];
+  const dy = pos[i2*3+1] - pos[i3*3+1];
+  const dz = pos[i2*3+2] - pos[i3*3+2];
+  const restLen = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  bendConstraints.push({ i0: i2, i1: i3, restLen });
+}
+
+for (let r = 0; r < ROWS; r++) {
+  for (let c = 0; c < COLS; c++) {
+    const i = idx(r, c);
+    // Horizontal
+    if (c < COLS - 1) addDist(i, idx(r, c + 1));
+    // Vertical
+    if (r < ROWS - 1) addDist(i, idx(r + 1, c));
+    // Shear diagonals
+    if (c < COLS - 1 && r < ROWS - 1) {
+      addDist(i, idx(r + 1, c + 1));
+      addDist(idx(r, c + 1), idx(r + 1, c));
+    }
+    // Bending — skip one particle
+    if (c < COLS - 2) addBend(i, idx(r, c+1), i, idx(r, c + 2));
+    if (r < ROWS - 2) addBend(i, idx(r+1, c), i, idx(r + 2, c));
+  }
+}
+
+function solveConstraint(c, compliance, dt) {
+  const { i0, i1, restLen } = c;
+  const w0 = invMass[i0], w1 = invMass[i1];
+  const wSum = w0 + w1;
+  if (wSum === 0) return;
+
+  const dx = pos[i1*3] - pos[i0*3];
+  const dy = pos[i1*3+1] - pos[i0*3+1];
+  const dz = pos[i1*3+2] - pos[i0*3+2];
+  const len = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  if (len < 1e-8) return;
+
+  const alpha = compliance / (dt * dt);
+  const C = len - restLen;
+  const lambda = -C / (wSum + alpha);
+
+  const nx = dx / len, ny = dy / len, nz = dz / len;
+
+  pos[i0*3]   -= w0 * lambda * nx;
+  pos[i0*3+1] -= w0 * lambda * ny;
+  pos[i0*3+2] -= w0 * lambda * nz;
+  pos[i1*3]   += w1 * lambda * nx;
+  pos[i1*3+1] += w1 * lambda * ny;
+  pos[i1*3+2] += w1 * lambda * nz;
+}
+
+// Wind + air resistance
+let time = 0;
+
+function applyExternalForces(dt) {
+  time += dt;
+
+  for (let i = 0; i < numParticles; i++) {
+    if (invMass[i] === 0) continue;
+
+    // Gravity — very gentle, mostly cancelled by updraft
+    vel[i*3+1] += GRAVITY * dt * 0.02;
+
+    // Multi-frequency organic wind
+    const px = pos[i*3], py = pos[i*3+1], pz = pos[i*3+2];
+    const t = time;
+
+    // Large-scale billowing
+    const windX = (Math.sin(t * 0.3 + py * 2.0) * 0.15 +
+                   Math.sin(t * 0.7 + pz * 1.5) * 0.08) * 0.5;
+    const windY = (Math.cos(t * 0.25 + px * 1.8) * 0.1 +
+                   Math.sin(t * 0.5) * 0.05) * 0.5;
+    const windZ = (Math.sin(t * 0.4 + px * 2.2 + py * 1.3) * 0.2 +
+                   Math.cos(t * 0.15) * 0.15 +
+                   Math.sin(t * 0.8 + py * 3.0) * 0.06) * 0.5;
+
+    vel[i*3]   += windX * dt;
+    vel[i*3+1] += windY * dt;
+    vel[i*3+2] += windZ * dt;
+  }
+}
+
+// Air drag per triangle
+function applyAeroDrag(dt) {
+  for (let r = 0; r < ROWS - 1; r++) {
+    for (let c = 0; c < COLS - 1; c++) {
+      const i0 = idx(r, c), i1 = idx(r, c+1), i2 = idx(r+1, c);
+      applyTriangleDrag(i0, i1, i2, dt);
+      const i3 = idx(r+1, c+1);
+      applyTriangleDrag(i1, i3, i2, dt);
+    }
+  }
+}
+
+function applyTriangleDrag(i0, i1, i2, dt) {
+  // Average velocity of triangle
+  const vx = (vel[i0*3] + vel[i1*3] + vel[i2*3]) / 3;
+  const vy = (vel[i0*3+1] + vel[i1*3+1] + vel[i2*3+1]) / 3;
+  const vz = (vel[i0*3+2] + vel[i1*3+2] + vel[i2*3+2]) / 3;
+
+  // Triangle normal
+  const e1x = pos[i1*3] - pos[i0*3];
+  const e1y = pos[i1*3+1] - pos[i0*3+1];
+  const e1z = pos[i1*3+2] - pos[i0*3+2];
+  const e2x = pos[i2*3] - pos[i0*3];
+  const e2y = pos[i2*3+1] - pos[i0*3+1];
+  const e2z = pos[i2*3+2] - pos[i0*3+2];
+
+  const nx = e1y*e2z - e1z*e2y;
+  const ny = e1z*e2x - e1x*e2z;
+  const nz = e1x*e2y - e1y*e2x;
+
+  const area = Math.sqrt(nx*nx + ny*ny + nz*nz) * 0.5;
+  if (area < 1e-8) return;
+
+  const nnx = nx / (area*2), nny = ny / (area*2), nnz = nz / (area*2);
+
+  // Project velocity onto normal
+  const vDotN = vx*nnx + vy*nny + vz*nnz;
+  const projArea = area * Math.abs(vDotN);
+
+  const speed = Math.sqrt(vx*vx + vy*vy + vz*vz);
+  if (speed < 1e-8) return;
+
+  const dragMag = 0.5 * AIR_DENSITY * DRAG_COEFF * projArea * speed;
+  const fx = -dragMag * vx / speed / 3;
+  const fy = -dragMag * vy / speed / 3;
+  const fz = -dragMag * vz / speed / 3;
+
+  for (const i of [i0, i1, i2]) {
+    vel[i*3]   += fx * dt * invMass[i];
+    vel[i*3+1] += fy * dt * invMass[i];
+    vel[i*3+2] += fz * dt * invMass[i];
+  }
+}
+
+// Soft centring to keep cloth in view
+function applyCentring() {
+  let cx = 0, cy = 0, cz = 0;
+  for (let i = 0; i < numParticles; i++) {
+    cx += pos[i*3]; cy += pos[i*3+1]; cz += pos[i*3+2];
+  }
+  cx /= numParticles; cy /= numParticles; cz /= numParticles;
+
+  const k = 0.003;
+  for (let i = 0; i < numParticles; i++) {
+    pos[i*3]   -= cx * k;
+    pos[i*3+1] -= cy * k;
+    pos[i*3+2] -= cz * k;
+    prevPos[i*3]   -= cx * k;
+    prevPos[i*3+1] -= cy * k;
+    prevPos[i*3+2] -= cz * k;
+  }
+}
+
+function simulate() {
+  const dt = 1 / 60 / SUBSTEPS;
+
+  for (let sub = 0; sub < SUBSTEPS; sub++) {
+    applyExternalForces(dt);
+    applyAeroDrag(dt);
+
+    // Predict positions
+    for (let i = 0; i < numParticles; i++) {
+      if (invMass[i] === 0) continue;
+      vel[i*3]   *= DAMPING;
+      vel[i*3+1] *= DAMPING;
+      vel[i*3+2] *= DAMPING;
+      prevPos[i*3]   = pos[i*3];
+      prevPos[i*3+1] = pos[i*3+1];
+      prevPos[i*3+2] = pos[i*3+2];
+      pos[i*3]   += vel[i*3] * dt;
+      pos[i*3+1] += vel[i*3+1] * dt;
+      pos[i*3+2] += vel[i*3+2] * dt;
+    }
+
+    // Solve constraints
+    for (let iter = 0; iter < ITERATIONS; iter++) {
+      for (const c of distConstraints) solveConstraint(c, STRETCH_COMPLIANCE, dt);
+      for (const c of bendConstraints) solveConstraint(c, BEND_COMPLIANCE, dt);
+    }
+
+    // Update velocities from position delta
+    for (let i = 0; i < numParticles; i++) {
+      if (invMass[i] === 0) continue;
+      vel[i*3]   = (pos[i*3]   - prevPos[i*3])   / dt;
+      vel[i*3+1] = (pos[i*3+1] - prevPos[i*3+1]) / dt;
+      vel[i*3+2] = (pos[i*3+2] - prevPos[i*3+2]) / dt;
+    }
+  }
+
+  applyCentring();
+}
+
+// ═══════════════════════════════════════════════
+// PROCEDURAL SHWESHWE TEXTURE (high-res)
+// ═══════════════════════════════════════════════
+const TEX_SIZE = 1024;
+
+function generateShweshweTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = TEX_SIZE;
+  canvas.height = TEX_SIZE;
+  const ctx = canvas.getContext('2d');
+
+  const pri = palette.primary;
+  const acc = palette.accent;
+  const mid = palette.mid;
+
+  const data = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+  const px = data.data;
+
+  for (let y = 0; y < TEX_SIZE; y++) {
+    for (let x = 0; x < TEX_SIZE; x++) {
+      const i = (y * TEX_SIZE + x) * 4;
+
+      // Multi-scale shweshwe pattern
+      const cellSize = 32; // pixels per repeat cell
+      const cx = x % cellSize;
+      const cy = y % cellSize;
+      const cellX = Math.floor(x / cellSize);
+      const cellY = Math.floor(y / cellSize);
+
+      // Checkerboard at cell level
+      const checker = (cellX + cellY) % 2 === 0;
+
+      // Normalised position within cell
+      const nx = cx / cellSize;
+      const ny = cy / cellSize;
+
+      // Diamond motif (centred in cell)
+      const diamond = Math.abs(nx - 0.5) + Math.abs(ny - 0.5);
+
+      // Concentric diamond rings
+      const ring1 = Math.abs(diamond - 0.2) < 0.04;
+      const ring2 = Math.abs(diamond - 0.35) < 0.03;
+
+      // Small dots at corners of each cell
+      const dotRadius = 0.08;
+      const dot = (nx < dotRadius && ny < dotRadius) ||
+                  (nx > 1 - dotRadius && ny < dotRadius) ||
+                  (nx < dotRadius && ny > 1 - dotRadius) ||
+                  (nx > 1 - dotRadius && ny > 1 - dotRadius);
+
+      // Cross motif
+      const cross = (Math.abs(nx - 0.5) < 0.03 && Math.abs(ny - 0.5) < 0.15) ||
+                    (Math.abs(ny - 0.5) < 0.03 && Math.abs(nx - 0.5) < 0.15);
+
+      // Fine grid lines
+      const gridLine = (cx % 4 === 0) || (cy % 4 === 0);
+
+      // Small sub-cell pattern — tiny diamonds
+      const subCell = 8;
+      const scx = (x % subCell) / subCell;
+      const scy = (y % subCell) / subCell;
+      const microDiamond = Math.abs(scx - 0.5) + Math.abs(scy - 0.5) < 0.25;
+
+      let col;
+      if (checker) {
+        // Primary cell
+        col = [...pri];
+        if (ring1 || ring2) {
+          col = [...acc];
+        } else if (diamond < 0.15) {
+          // Centre diamond filled
+          col = [acc[0]*0.95, acc[1]*0.95, acc[2]*0.95];
+        } else if (dot) {
+          col = [...acc];
+        } else if (cross && diamond > 0.25) {
+          col = [mid[0]*1.2, mid[1]*1.2, mid[2]*1.2];
+        } else if (microDiamond && !gridLine) {
+          col = [pri[0]*1.1, pri[1]*1.1, pri[2]*1.1];
+        } else if (gridLine) {
+          col = [pri[0]*0.85, pri[1]*0.85, pri[2]*0.85];
+        }
+      } else {
+        // Accent cell
+        col = [...acc];
+        if (ring1) {
+          col = [...pri];
+        } else if (diamond < 0.12) {
+          col = [...pri];
+        } else if (dot) {
+          col = [...mid];
+        } else if (gridLine) {
+          col = [acc[0]*0.92, acc[1]*0.92, acc[2]*0.92];
+        } else if (microDiamond) {
+          col = [acc[0]*0.96, acc[1]*0.96, acc[2]*0.96];
+        }
+      }
+
+      // Subtle thread noise — simulates weave texture
+      const noise = (Math.sin(x * 47.3 + y * 31.7) * 0.5 + 0.5) * 0.03 - 0.015;
+
+      px[i]     = Math.min(255, Math.max(0, (col[0] + noise) * 255));
+      px[i + 1] = Math.min(255, Math.max(0, (col[1] + noise) * 255));
+      px[i + 2] = Math.min(255, Math.max(0, (col[2] + noise) * 255));
+      px[i + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(data, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.repeat.set(3, 3);
+  return tex;
+}
+
+// Normal map from weave pattern
+function generateWeaveNormalMap() {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const data = ctx.createImageData(size, size);
+  const px = data.data;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      // Weave pattern — interlocking horizontal/vertical bumps
+      const warpBump = Math.sin(x * Math.PI * 2 / 4) * Math.cos(y * Math.PI / 8);
+      const weftBump = Math.sin(y * Math.PI * 2 / 4) * Math.cos(x * Math.PI / 8);
+
+      // Determine which yarn is on top (plain weave)
+      const cellX = Math.floor(x / 4);
+      const cellY = Math.floor(y / 4);
+      const onTop = (cellX + cellY) % 2 === 0;
+
+      const bump = onTop ? warpBump * 0.5 : weftBump * 0.5;
+
+      // Finite differences for normal
+      const scale = 0.8;
+      const nx = onTop ?
+        Math.cos(x * Math.PI * 2 / 4) * Math.cos(y * Math.PI / 8) * scale :
+        -Math.sin(y * Math.PI * 2 / 4) * Math.sin(x * Math.PI / 8) * scale * 0.3;
+      const ny = onTop ?
+        Math.sin(x * Math.PI * 2 / 4) * (-Math.sin(y * Math.PI / 8)) * scale * 0.3 :
+        Math.cos(y * Math.PI * 2 / 4) * Math.cos(x * Math.PI / 8) * scale;
+
+      px[i]     = Math.min(255, Math.max(0, (nx * 0.5 + 0.5) * 255));
+      px[i + 1] = Math.min(255, Math.max(0, (ny * 0.5 + 0.5) * 255));
+      px[i + 2] = 200; // z-component (mostly up)
+      px[i + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(data, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(12, 12);
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  return tex;
+}
+
+// ═══════════════════════════════════════════════
+// CUSTOM FABRIC SHADER
+// ═══════════════════════════════════════════════
+
+const fabricVertexShader = `
+varying vec3 vNormal;
+varying vec3 vWorldPos;
+varying vec2 vUv;
+varying vec3 vTangent;
+varying vec3 vBitangent;
+
+attribute vec3 tangent_attr;
+
+void main() {
+  vUv = uv;
+  vNormal = normalize(normalMatrix * normal);
+  vec4 worldPos = modelMatrix * vec4(position, 1.0);
+  vWorldPos = worldPos.xyz;
+
+  // Compute tangent/bitangent for anisotropic shading
+  vTangent = normalize(normalMatrix * tangent_attr);
+  vBitangent = cross(vNormal, vTangent);
+
+  gl_Position = projectionMatrix * viewMatrix * worldPos;
+}
+`;
+
+const fabricFragmentShader = `
+precision highp float;
+
+uniform sampler2D u_diffuseMap;
+uniform sampler2D u_normalMap;
+uniform vec3 u_lightDir1;
+uniform vec3 u_lightDir2;
+uniform vec3 u_lightCol1;
+uniform vec3 u_lightCol2;
+uniform vec3 u_cameraPos;
+uniform float u_time;
+
+varying vec3 vNormal;
+varying vec3 vWorldPos;
+varying vec2 vUv;
+varying vec3 vTangent;
+varying vec3 vBitangent;
+
+// Anisotropic specular — Kajiya-Kay model for fabric
+float anisoSpec(vec3 T, vec3 H, float exp) {
+  float TdotH = dot(T, H);
+  float sinTH = sqrt(max(0.0, 1.0 - TdotH * TdotH));
+  return pow(sinTH, exp);
+}
+
+// Fresnel-Schlick
+float fresnel(float cosTheta, float f0) {
+  return f0 + (1.0 - f0) * pow(1.0 - cosTheta, 5.0);
+}
+
+void main() {
+  // Sample textures
+  vec4 diffuseTex = texture2D(u_diffuseMap, vUv);
+
+  // Normal mapping
+  vec3 normalMapVal = texture2D(u_normalMap, vUv).xyz * 2.0 - 1.0;
+  mat3 TBN = mat3(normalize(vTangent), normalize(vBitangent), normalize(vNormal));
+  vec3 N = normalize(TBN * normalMapVal);
+
+  vec3 V = normalize(u_cameraPos - vWorldPos);
+  float NdotV = max(dot(N, V), 0.0);
+
+  // Warp tangent (along U) and weft tangent (along V)
+  vec3 warpT = normalize(vTangent);
+  vec3 weftT = normalize(vBitangent);
+
+  vec3 color = vec3(0.0);
+
+  // Two-light setup
+  vec3 lights[2];
+  vec3 lightCols[2];
+  lights[0] = normalize(u_lightDir1);
+  lights[1] = normalize(u_lightDir2);
+  lightCols[0] = u_lightCol1;
+  lightCols[1] = u_lightCol2;
+
+  for (int l = 0; l < 2; l++) {
+    vec3 L = lights[l];
+    vec3 H = normalize(L + V);
+    float NdotL = max(dot(N, L), 0.0);
+
+    // Diffuse — wrap lighting for soft fabric look
+    float wrap = 0.35;
+    float diffuse = max(0.0, (dot(N, L) + wrap) / (1.0 + wrap));
+
+    // Dual anisotropic specular — warp and weft highlights
+    float specWarp = anisoSpec(warpT, H, 40.0) * 0.35;
+    float specWeft = anisoSpec(weftT, H, 30.0) * 0.25;
+
+    // Fresnel
+    float F = fresnel(NdotV, 0.04);
+
+    // Sheen — for fabric edge brightness (velvet/cotton effect)
+    float sheen = pow(1.0 - NdotV, 3.0) * 0.15;
+
+    // Subsurface translucency — light through thin fabric
+    float translucency = max(0.0, dot(V, -L)) * 0.12;
+    vec3 transCol = diffuseTex.rgb * vec3(1.2, 0.9, 0.8);
+
+    color += lightCols[l] * (
+      diffuseTex.rgb * diffuse * 0.85 +
+      (specWarp + specWeft) * F * lightCols[l] +
+      sheen * diffuseTex.rgb * 1.5 +
+      transCol * translucency
+    );
+  }
+
+  // Ambient
+  color += diffuseTex.rgb * vec3(0.04, 0.05, 0.07);
+
+  // Subtle rim glow
+  float rim = pow(1.0 - NdotV, 4.0);
+  color += rim * vec3(0.05, 0.08, 0.12);
+
+  // Back-face darkening
+  if (!gl_FrontFacing) {
+    color *= 0.6;
+  }
+
+  gl_FragColor = vec4(color, 1.0);
+}
+`;
+
+// ═══════════════════════════════════════════════
+// MESH SETUP
+// ═══════════════════════════════════════════════
+
+// Create geometry
+const geometry = new THREE.BufferGeometry();
+
+// Indices
+const indices = [];
+for (let r = 0; r < ROWS - 1; r++) {
+  for (let c = 0; c < COLS - 1; c++) {
+    const i = idx(r, c);
+    indices.push(i, idx(r, c+1), idx(r+1, c));
+    indices.push(idx(r, c+1), idx(r+1, c+1), idx(r+1, c));
+  }
+}
+geometry.setIndex(indices);
+
+// Position attribute
+const posAttr = new THREE.BufferAttribute(pos, 3);
+posAttr.setUsage(THREE.DynamicDrawUsage);
+geometry.setAttribute('position', posAttr);
+
+// UVs
+const uvs = new Float32Array(numParticles * 2);
+for (let r = 0; r < ROWS; r++) {
+  for (let c = 0; c < COLS; c++) {
+    const i = idx(r, c);
+    uvs[i * 2] = c / (COLS - 1);
+    uvs[i * 2 + 1] = r / (ROWS - 1);
+  }
+}
+geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+
+// Normals
+const normals = new Float32Array(numParticles * 3);
+geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+
+// Tangents for anisotropic shading
+const tangents = new Float32Array(numParticles * 3);
+geometry.setAttribute('tangent_attr', new THREE.BufferAttribute(tangents, 3));
+
+function updateNormals() {
+  const norms = geometry.attributes.normal.array;
+  const tangs = geometry.attributes.tangent_attr.array;
+  norms.fill(0);
+  tangs.fill(0);
+
+  for (let r = 0; r < ROWS - 1; r++) {
+    for (let c = 0; c < COLS - 1; c++) {
+      const i0 = idx(r, c), i1 = idx(r, c+1), i2 = idx(r+1, c);
+
+      const e1x = pos[i1*3] - pos[i0*3];
+      const e1y = pos[i1*3+1] - pos[i0*3+1];
+      const e1z = pos[i1*3+2] - pos[i0*3+2];
+      const e2x = pos[i2*3] - pos[i0*3];
+      const e2y = pos[i2*3+1] - pos[i0*3+1];
+      const e2z = pos[i2*3+2] - pos[i0*3+2];
+
+      const nx = e1y*e2z - e1z*e2y;
+      const ny = e1z*e2x - e1x*e2z;
+      const nz = e1x*e2y - e1y*e2x;
+
+      for (const i of [i0, i1, i2]) {
+        norms[i*3] += nx;
+        norms[i*3+1] += ny;
+        norms[i*3+2] += nz;
+      }
+    }
+  }
+
+  for (let i = 0; i < numParticles; i++) {
+    const len = Math.sqrt(norms[i*3]**2 + norms[i*3+1]**2 + norms[i*3+2]**2) || 1;
+    norms[i*3] /= len;
+    norms[i*3+1] /= len;
+    norms[i*3+2] /= len;
+  }
+
+  // Compute tangents (along U direction — warp)
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const i = idx(r, c);
+      let tx, ty, tz;
+      if (c < COLS - 1) {
+        const j = idx(r, c + 1);
+        tx = pos[j*3] - pos[i*3];
+        ty = pos[j*3+1] - pos[i*3+1];
+        tz = pos[j*3+2] - pos[i*3+2];
+      } else {
+        const j = idx(r, c - 1);
+        tx = pos[i*3] - pos[j*3];
+        ty = pos[i*3+1] - pos[j*3+1];
+        tz = pos[i*3+2] - pos[j*3+2];
+      }
+      const tl = Math.sqrt(tx*tx + ty*ty + tz*tz) || 1;
+      tangs[i*3] = tx/tl;
+      tangs[i*3+1] = ty/tl;
+      tangs[i*3+2] = tz/tl;
+    }
+  }
+
+  geometry.attributes.normal.needsUpdate = true;
+  geometry.attributes.tangent_attr.needsUpdate = true;
+}
+
+// Textures
+let diffuseMap = generateShweshweTexture();
+let normalMap = generateWeaveNormalMap();
+
+const material = new THREE.ShaderMaterial({
+  vertexShader: fabricVertexShader,
+  fragmentShader: fabricFragmentShader,
+  uniforms: {
+    u_diffuseMap: { value: diffuseMap },
+    u_normalMap: { value: normalMap },
+    u_lightDir1: { value: new THREE.Vector3(0.6, 0.8, 0.5).normalize() },
+    u_lightDir2: { value: new THREE.Vector3(-0.5, 0.3, -0.8).normalize() },
+    u_lightCol1: { value: new THREE.Vector3(1.0, 0.95, 0.9) },
+    u_lightCol2: { value: new THREE.Vector3(0.3, 0.35, 0.5) },
+    u_cameraPos: { value: new THREE.Vector3() },
+    u_time: { value: 0 },
+  },
+  side: THREE.DoubleSide,
+});
+
+const mesh = new THREE.Mesh(geometry, material);
+scene.add(mesh);
+
+// ═══════════════════════════════════════════════
+// ENVIRONMENT
+// ═══════════════════════════════════════════════
+
+// Subtle ambient particles
+const particleCount = 200;
+const particleGeo = new THREE.BufferGeometry();
+const particlePositions = new Float32Array(particleCount * 3);
+for (let i = 0; i < particleCount; i++) {
+  particlePositions[i*3] = (Math.random() - 0.5) * 10;
+  particlePositions[i*3+1] = (Math.random() - 0.5) * 10;
+  particlePositions[i*3+2] = (Math.random() - 0.5) * 10;
+}
+particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+
+const particleMat = new THREE.PointsMaterial({
+  color: 0xffffff,
+  size: 0.008,
+  transparent: true,
+  opacity: 0.15,
+  sizeAttenuation: true,
+});
+const particles = new THREE.Points(particleGeo, particleMat);
+scene.add(particles);
+
+// ═══════════════════════════════════════════════
+// PALETTE SWITCHING
+// ═══════════════════════════════════════════════
+
+function switchPalette() {
+  paletteIdx = (paletteIdx + 1) % PALETTES.length;
+  palette = PALETTES[paletteIdx];
+
+  // Regenerate texture
+  if (diffuseMap) diffuseMap.dispose();
+  diffuseMap = generateShweshweTexture();
+  material.uniforms.u_diffuseMap.value = diffuseMap;
+
+  // Show name
+  const el = document.getElementById('palette-name');
+  el.textContent = palette.name;
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 2000);
+}
+
+window.addEventListener('click', switchPalette);
+// Show initial palette
+document.getElementById('palette-name').textContent = palette.name;
+
+// ═══════════════════════════════════════════════
+// ANIMATION LOOP
+// ═══════════════════════════════════════════════
+
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const t = clock.getElapsedTime();
+
+  // Simulate physics
+  simulate();
+
+  // Update geometry
+  geometry.attributes.position.needsUpdate = true;
+  updateNormals();
+
+  // Camera — slow orbit, always looking at centre
+  const camRadius = 4.5;
+  const camSpeed = 0.12;
+  camera.position.set(
+    Math.sin(t * camSpeed) * camRadius,
+    Math.sin(t * camSpeed * 0.7) * 0.8 + 0.3,
+    Math.cos(t * camSpeed) * camRadius
+  );
+  camera.lookAt(0, 0, 0);
+
+  // Update uniforms
+  material.uniforms.u_cameraPos.value.copy(camera.position);
+  material.uniforms.u_time.value = t;
+
+  // Animate lights gently
+  const l1 = material.uniforms.u_lightDir1.value;
+  l1.set(
+    0.6 + Math.sin(t * 0.2) * 0.3,
+    0.8,
+    0.5 + Math.cos(t * 0.15) * 0.3
+  ).normalize();
+
+  // Drift particles
+  const pp = particles.geometry.attributes.position.array;
+  for (let i = 0; i < particleCount; i++) {
+    pp[i*3+1] += 0.001;
+    if (pp[i*3+1] > 5) pp[i*3+1] = -5;
+  }
+  particles.geometry.attributes.position.needsUpdate = true;
+
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// ═══════════════════════════════════════════════
+// RESIZE
+// ═══════════════════════════════════════════════
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
