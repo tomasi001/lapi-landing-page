@@ -53,6 +53,200 @@
   .ctrl-btn.active { color: #00ffd580; border-color: #00ffd530; }
   #music-btn { left: 2rem; }
   #mic-btn { left: 10rem; }
+  #dev-btn { left: 17rem; }
+
+  /* DEV PANEL */
+  #dev-panel {
+    position: fixed;
+    top: 0; right: 0;
+    width: 340px;
+    height: 100vh;
+    background: #0a0c12ee;
+    border-left: 1px solid #ffffff12;
+    z-index: 200;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6rem;
+    color: #ffffff80;
+    padding: 1rem 1.2rem 6rem;
+    box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: #ffffff15 transparent;
+    -webkit-overflow-scrolling: touch;
+  }
+  #dev-panel.open { transform: translateX(0); }
+  #dev-panel h3 {
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #00ffd560;
+    margin: 1.2rem 0 0.5rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid #ffffff0a;
+  }
+  #dev-panel h3:first-child { margin-top: 0.3rem; }
+  .p-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.3rem 0;
+    height: 1.4rem;
+  }
+  .p-row label {
+    flex: 0 0 110px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #ffffff50;
+    font-size: 0.58rem;
+  }
+  .p-row input[type=range] {
+    flex: 1;
+    height: 3px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #ffffff15;
+    border-radius: 2px;
+    outline: none;
+  }
+  .p-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #00ffd5;
+    cursor: pointer;
+  }
+  .p-row .p-val {
+    flex: 0 0 48px;
+    width: 48px;
+    text-align: right;
+    color: #ffffff70;
+    font-size: 0.55rem;
+    background: #ffffff08;
+    border: 1px solid #ffffff10;
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-family: inherit;
+    outline: none;
+    -moz-appearance: textfield;
+  }
+  .p-row .p-val:focus { border-color: #00ffd540; color: #ffffffa0; }
+  .p-row .p-val::-webkit-inner-spin-button,
+  .p-row .p-val::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .p-revert {
+    flex: 0 0 14px;
+    width: 14px; height: 14px;
+    background: none;
+    border: 1px solid #ffffff12;
+    border-radius: 3px;
+    color: #ffffff30;
+    font-size: 0.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: all 0.2s;
+    line-height: 1;
+  }
+  .p-revert:hover { border-color: #ff6b4a40; color: #ff6b4a90; }
+  .p-revert.changed { border-color: #ff6b4a30; color: #ff6b4a60; }
+  .snap-btn {
+    display: block;
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.6rem;
+    background: #ffffff08;
+    border: 1px solid #ffffff15;
+    color: #ffffff60;
+    font-family: inherit;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .snap-btn:hover { background: #ffffff15; color: #ffffffa0; }
+  .snap-btn.primary { background: #00ffd510; border-color: #00ffd530; color: #00ffd580; }
+  .snap-btn.primary:hover { background: #00ffd520; color: #00ffd5c0; }
+  .snap-btn.danger { border-color: #ff6b4a20; color: #ff6b4a60; }
+  .snap-btn.danger:hover { background: #ff6b4a15; color: #ff6b4a90; }
+  #snapshot-list {
+    margin-top: 0.8rem;
+  }
+  .snap-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid #ffffff08;
+    font-size: 0.52rem;
+  }
+  .snap-item .snap-name {
+    flex: 1;
+    color: #ffffff60;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .snap-item .snap-time {
+    color: #ffffff25;
+    font-size: 0.48rem;
+    flex: 0 0 auto;
+  }
+  .snap-item button {
+    flex: 0 0 auto;
+    background: none;
+    border: 1px solid #ffffff12;
+    border-radius: 3px;
+    color: #ffffff40;
+    font-family: inherit;
+    font-size: 0.48rem;
+    padding: 2px 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .snap-item button:hover { border-color: #00ffd530; color: #00ffd580; }
+  .snap-item button.snap-del:hover { border-color: #ff6b4a40; color: #ff6b4a80; }
+  #copy-json {
+    display: block;
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.6rem;
+    background: #00ffd510;
+    border: 1px solid #00ffd530;
+    color: #00ffd580;
+    font-family: inherit;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  #copy-json:hover { background: #00ffd520; color: #00ffd5c0; }
+  #copy-json.copied { color: #ffffff; background: #00ffd540; }
+  .p-tip {
+    font-size: 0.48rem;
+    color: #ffffff28;
+    margin: -0.1rem 0 0.3rem 0;
+    padding-left: 2px;
+    line-height: 1.3;
+  }
+  .band-meter {
+    flex: 0 0 30px;
+    height: 3px;
+    background: #ffffff10;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .band-meter-fill {
+    height: 100%;
+    background: #00ffd5;
+    transition: width 0.05s;
+    border-radius: 2px;
+  }
 </style>
 </head>
 <body>
@@ -60,6 +254,8 @@
 <div id="palette-name"></div>
 <button class="ctrl-btn" id="music-btn">&#9654; music</button>
 <button class="ctrl-btn" id="mic-btn">mic off</button>
+<button class="ctrl-btn" id="dev-btn">dev</button>
+<div id="dev-panel"></div>
 
 <script type="importmap">
 {
@@ -74,19 +270,253 @@
 import * as THREE from 'three';
 
 // ═══════════════════════════════════════════════
-// CONFIG
+// TUNABLE PARAMS — all exposed via dev panel
+// ═══════════════════════════════════════════════
+const P = {
+  // Physics
+  substeps: 8,
+  iterations: 2,
+  gravity: -0.8,
+  damping: 0.998,
+  stretchCompliance: 0.0,
+  bendCompliance: 0.0001,
+  airDensity: 1.2,
+  dragCoeff: 0.04,
+  gravityDtMult: 0.02,
+
+  // Wind
+  windMultBase: 1.0,
+  windMultBass: 2.0,
+  windMultSubBass: 1.2,
+  displaceSubBass: 0.25,
+  breathingMult: 40,
+  swayMult: 12,
+
+  // Ripple
+  rippleSpeed: 2.5,
+  rippleFreq: 7.0,
+  rippleDecay: 2.5,
+  rippleSpatialDecay: 1.5,
+  rippleAmplitude: 0.12,
+  rippleImpulse: 8.0,
+
+  // Drag
+  grabRadius: 8,
+  maxDragDisplacement: 0.04,
+  dragLerp: 0.35,
+  maxThrowSpeed: 15,
+  throwMultiplier: 20,
+
+  // Rest Return
+  restReturnMinK: 0.04,
+  restReturnMaxK: 0.25,
+  restReturnRamp: 0.08,
+  velClampSpeed: 8.0,
+  centringK: 0.003,
+
+  // Camera
+  camRadius: 5.0,
+  camSpeed: 0.12,
+  camAudioPush: 0.3,
+  camVertAmp: 0.8,
+  camVertOffset: 0.3,
+
+  // Audio
+  audioSmoothing: 0.7,
+  musicVolume: 0.5,
+
+  // Trail
+  trailFadeRate: 0.4,
+  trailDrift: 0.015,
+
+  // Lighting
+  light1X: 0.6,
+  light1Y: 0.8,
+  light1Z: 0.5,
+  light2X: -0.5,
+  light2Y: 0.3,
+  light2Z: -0.8,
+  light1R: 1.0,
+  light1G: 0.95,
+  light1B: 0.9,
+  light2R: 0.3,
+  light2G: 0.35,
+  light2B: 0.5,
+};
+
+// ═══════════════════════════════════════════════
+// DEV PANEL — slider definitions
+// ═══════════════════════════════════════════════
+const PARAM_DEFS = {
+  'Physics': [
+    { key: 'substeps',          min: 1,    max: 20,    step: 1,      tip: 'How many mini-steps per frame. Higher = more accurate but slower. Makes the cloth feel tighter and more stable.' },
+    { key: 'iterations',        min: 1,    max: 10,    step: 1,      tip: 'How many times constraints are solved per step. More = stiffer, less stretchy cloth.' },
+    { key: 'gravity',           min: -3,   max: 0,     step: 0.05,   tip: 'How hard gravity pulls the cloth down. More negative = heavier cloth. 0 = floats in space.' },
+    { key: 'damping',           min: 0.95, max: 1,     step: 0.001,  tip: 'How quickly movement dies out. 1 = never stops, 0.95 = very sluggish. Think of it as air resistance on every particle.' },
+    { key: 'stretchCompliance', min: 0,    max: 0.01,  step: 0.0001, tip: 'How stretchy the cloth is. 0 = totally rigid edges, higher = rubber-band-like. Even tiny values make a big difference.' },
+    { key: 'bendCompliance',    min: 0,    max: 0.01,  step: 0.0001, tip: 'How easy it is to fold the cloth. 0 = stiff like cardboard, higher = soft like silk.' },
+    { key: 'airDensity',        min: 0,    max: 5,     step: 0.1,    tip: 'How thick the air feels. Higher = cloth billows and catches wind more dramatically.' },
+    { key: 'dragCoeff',         min: 0,    max: 0.2,   step: 0.005,  tip: 'How much the air slows the cloth down. Higher = parachute effect, lower = cuts through air like a knife.' },
+    { key: 'gravityDtMult',     min: 0,    max: 0.1,   step: 0.002,  tip: 'Scales how strongly gravity is applied each step. Lower = gentle floating, higher = heavy pull.' },
+  ],
+  'Wind / Audio Force': [
+    { key: 'windMultBase',    min: 0,  max: 5,   step: 0.1,  tip: 'Base wind strength when no music is playing. 0 = dead calm, higher = constant breeze.' },
+    { key: 'windMultBass',    min: 0,  max: 10,  step: 0.1,  tip: 'How much bass frequencies boost the wind. Crank it up and the cloth surges with every kick drum.' },
+    { key: 'windMultSubBass', min: 0,  max: 5,   step: 0.1,  tip: 'How much deep sub-bass rumble adds to wind. Those really low frequencies you feel more than hear.' },
+    { key: 'displaceSubBass', min: 0,  max: 1,   step: 0.01, tip: 'How much sub-bass pushes the cloth in and out, like breathing. Higher = the cloth pulses with deep bass.' },
+    { key: 'breathingMult',   min: 0,  max: 100, step: 1,    tip: 'Strength of the breathing/pulsing animation driven by sub-bass. Makes the cloth feel alive.' },
+    { key: 'swayMult',        min: 0,  max: 40,  step: 0.5,  tip: 'How much the mid frequencies make the cloth sway side to side. Like the cloth is dancing.' },
+  ],
+  'Ripple': [
+    { key: 'rippleSpeed',        min: 0.5, max: 10,  step: 0.1,  tip: 'How fast the ripple wave travels outward from where you clicked. Higher = instant splash, lower = slow pond ripple.' },
+    { key: 'rippleFreq',         min: 1,   max: 20,  step: 0.5,  tip: 'How many wave peaks in the ripple. Higher = tight, detailed waves. Lower = big, smooth rolls.' },
+    { key: 'rippleDecay',        min: 0.5, max: 10,  step: 0.1,  tip: 'How quickly the ripple fades over time. Higher = quick splash, lower = ripple lingers for ages.' },
+    { key: 'rippleSpatialDecay', min: 0.1, max: 5,   step: 0.1,  tip: 'How quickly the ripple fades with distance from the click point. Higher = small local splash, lower = reaches the edges.' },
+    { key: 'rippleAmplitude',    min: 0,   max: 0.5, step: 0.01, tip: 'How tall the ripple waves are. Higher = dramatic splash, lower = subtle shimmer.' },
+    { key: 'rippleImpulse',      min: 1,   max: 30,  step: 0.5,  tip: 'The force behind each ripple wave. Multiplies the wave into actual cloth movement.' },
+  ],
+  'Drag': [
+    { key: 'grabRadius',          min: 1,  max: 20,  step: 1,     tip: 'How many nearby particles move when you drag. Higher = grabs a bigger chunk of cloth, like a fist. Lower = pinches a tiny spot.' },
+    { key: 'maxDragDisplacement', min: 0.005, max: 0.2, step: 0.005, tip: 'Max distance the cloth can move per frame while dragging. Lower = smoother, prevents folding through itself. Higher = more responsive but riskier.' },
+    { key: 'dragLerp',            min: 0.05, max: 1,  step: 0.05, tip: 'How quickly the cloth follows your mouse while dragging. 1 = instant snap, 0.05 = lazy, silky smooth trailing.' },
+    { key: 'maxThrowSpeed',       min: 1,  max: 50,  step: 1,     tip: 'Speed limit when you release the cloth after dragging. Prevents it from flying off into infinity.' },
+    { key: 'throwMultiplier',     min: 1,  max: 50,  step: 1,     tip: 'How much momentum transfers when you let go. Higher = cloth keeps moving fast in the direction you threw it.' },
+  ],
+  'Rest Return': [
+    { key: 'restReturnMinK',  min: 0,   max: 0.5, step: 0.005, tip: 'Starting spring strength pulling cloth back to flat after you let go. Low = gentle, gradual return.' },
+    { key: 'restReturnMaxK',  min: 0,   max: 1,   step: 0.01,  tip: 'Maximum spring strength over time. How aggressively it snaps back to flat. Higher = forceful reset.' },
+    { key: 'restReturnRamp',  min: 0,   max: 0.5, step: 0.005, tip: 'How fast the spring ramps from min to max. Higher = quickly forces the cloth flat. Lower = lets it settle naturally.' },
+    { key: 'velClampSpeed',   min: 1,   max: 30,  step: 0.5,   tip: 'Global speed limit for all particles. Prevents anything from moving too fast. Safety net against explosions.' },
+    { key: 'centringK',       min: 0,   max: 0.02, step: 0.001, tip: 'Gentle force keeping the whole cloth centred on screen. Without it, the cloth can drift off into the void.' },
+  ],
+  'Camera': [
+    { key: 'camRadius',     min: 2,   max: 15,  step: 0.1,  tip: 'How far the camera orbits from the cloth. Smaller = zoomed in close, bigger = pulled way back.' },
+    { key: 'camSpeed',      min: 0,   max: 0.5, step: 0.01, tip: 'How fast the camera orbits around the cloth. 0 = frozen in place, higher = spinning around it.' },
+    { key: 'camAudioPush',  min: 0,   max: 2,   step: 0.05, tip: 'How much bass pushes the camera closer/further. Creates a zoom-pulse effect synced to the beat.' },
+    { key: 'camVertAmp',    min: 0,   max: 3,   step: 0.1,  tip: 'How much the camera bobs up and down as it orbits. 0 = flat circle, higher = roller-coaster.' },
+    { key: 'camVertOffset', min: -2,  max: 2,   step: 0.1,  tip: 'Shifts the camera up or down. Positive = looking down at the cloth, negative = looking up at it.' },
+  ],
+  'Audio': [
+    { key: 'audioSmoothing', min: 0, max: 1,   step: 0.05, tip: 'How much the audio analysis smooths out over time. 0 = raw and jittery, 1 = very sluggish and averaged.' },
+    { key: 'musicVolume',    min: 0, max: 1,   step: 0.05, tip: 'Volume of the background music track. Doesn\'t affect how strongly the cloth reacts — just what you hear.' },
+  ],
+  'Trail': [
+    { key: 'trailFadeRate', min: 0.05, max: 2,   step: 0.05, tip: 'How fast sparkle particles fade out. Higher = quick flash, lower = long glowing trails behind your drag.' },
+    { key: 'trailDrift',    min: 0,    max: 0.1, step: 0.005, tip: 'How fast sparkle particles float upward. 0 = stay in place, higher = they rise like embers.' },
+  ],
+  'Lighting': [
+    { key: 'light1X', min: -1, max: 1, step: 0.05, tip: 'Main light direction — left/right. Moves the primary light source horizontally.' },
+    { key: 'light1Y', min: -1, max: 1, step: 0.05, tip: 'Main light direction — up/down. Higher = light from above, lower = light from below.' },
+    { key: 'light1Z', min: -1, max: 1, step: 0.05, tip: 'Main light direction — front/back. Positive = light from in front, negative = from behind.' },
+    { key: 'light2X', min: -1, max: 1, step: 0.05, tip: 'Fill light direction — left/right. The secondary, cooler-toned light.' },
+    { key: 'light2Y', min: -1, max: 1, step: 0.05, tip: 'Fill light direction — up/down.' },
+    { key: 'light2Z', min: -1, max: 1, step: 0.05, tip: 'Fill light direction — front/back.' },
+    { key: 'light1R', min: 0, max: 2, step: 0.05, tip: 'Main light red channel. Adjust to warm up or cool down the primary light colour.' },
+    { key: 'light1G', min: 0, max: 2, step: 0.05, tip: 'Main light green channel.' },
+    { key: 'light1B', min: 0, max: 2, step: 0.05, tip: 'Main light blue channel.' },
+    { key: 'light2R', min: 0, max: 2, step: 0.05, tip: 'Fill light red channel. The fill light is usually cooler/bluer.' },
+    { key: 'light2G', min: 0, max: 2, step: 0.05, tip: 'Fill light green channel.' },
+    { key: 'light2B', min: 0, max: 2, step: 0.05, tip: 'Fill light blue channel.' },
+  ],
+};
+
+// Build dev panel UI
+const devPanel = document.getElementById('dev-panel');
+const devBtn = document.getElementById('dev-btn');
+const sliderEls = {};
+const valEls = {};
+const bandMeterEls = {};
+
+function buildDevPanel() {
+  let html = '';
+  for (const [section, params] of Object.entries(PARAM_DEFS)) {
+    html += `<h3>${section}</h3>`;
+    for (const { key, min, max, step, tip } of params) {
+      const val = P[key];
+      const decimals = step < 0.001 ? 4 : step < 0.01 ? 3 : step < 1 ? 2 : 0;
+      html += `<div class="p-row">
+        <label title="${key}">${key}</label>
+        <input type="range" id="sl_${key}" min="${min}" max="${max}" step="${step}" value="${val}">
+        <span class="p-val" id="vl_${key}">${val.toFixed(decimals)}</span>
+      </div>`;
+      if (tip) html += `<div class="p-tip">${tip}</div>`;
+    }
+  }
+
+  // Audio band meters
+  html += '<h3>Audio Bands (live)</h3>';
+  const bands = ['subBass', 'bass', 'lowMid', 'mid', 'highMid', 'high'];
+  for (const b of bands) {
+    html += `<div class="p-row">
+      <label>${b}</label>
+      <div class="band-meter"><div class="band-meter-fill" id="bm_${b}" style="width:0%"></div></div>
+      <span class="p-val" id="bv_${b}">0.00</span>
+    </div>`;
+  }
+
+  html += '<button id="copy-json">Copy JSON</button>';
+  devPanel.innerHTML = html;
+
+  // Cache elements and wire events
+  for (const [, params] of Object.entries(PARAM_DEFS)) {
+    for (const { key, step } of params) {
+      const sl = document.getElementById(`sl_${key}`);
+      const vl = document.getElementById(`vl_${key}`);
+      sliderEls[key] = sl;
+      valEls[key] = vl;
+      const decimals = step < 0.001 ? 4 : step < 0.01 ? 3 : step < 1 ? 2 : 0;
+      sl.addEventListener('input', () => {
+        const v = parseFloat(sl.value);
+        P[key] = v;
+        vl.textContent = v.toFixed(decimals);
+        // Live-apply specific params that need immediate effect
+        if (key === 'musicVolume' && musicAudio) musicAudio.volume = v;
+        if (key === 'audioSmoothing' && analyser) analyser.smoothingTimeConstant = v;
+      });
+    }
+  }
+
+  for (const b of bands) {
+    bandMeterEls[b] = document.getElementById(`bm_${b}`);
+  }
+
+  document.getElementById('copy-json').addEventListener('click', function() {
+    const json = JSON.stringify(P, null, 2);
+    navigator.clipboard.writeText(json).then(() => {
+      this.classList.add('copied');
+      this.textContent = 'Copied!';
+      setTimeout(() => { this.classList.remove('copied'); this.textContent = 'Copy JSON'; }, 1500);
+    });
+  });
+}
+buildDevPanel();
+
+devBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  devPanel.classList.toggle('open');
+  devBtn.classList.toggle('active');
+});
+
+// Prevent dev panel interactions from triggering cloth interaction
+devPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
+devPanel.addEventListener('pointermove', (e) => e.stopPropagation());
+devPanel.addEventListener('pointerup', (e) => e.stopPropagation());
+
+function updateBandMeters() {
+  for (const b of ['subBass', 'bass', 'lowMid', 'mid', 'highMid', 'high']) {
+    const v = audioBands[b];
+    if (bandMeterEls[b]) bandMeterEls[b].style.width = `${Math.min(100, v * 100)}%`;
+    const bv = document.getElementById(`bv_${b}`);
+    if (bv) bv.textContent = v.toFixed(2);
+  }
+}
+
+// ═══════════════════════════════════════════════
+// CONFIG (non-tunable)
 // ═══════════════════════════════════════════════
 const COLS = 120;
 const ROWS = 90;
 const SPACING = 0.036;
-const SUBSTEPS = 8;
-const ITERATIONS = 2;
-const GRAVITY = -0.8;
-const DAMPING = 0.998;
-const STRETCH_COMPLIANCE = 0.0;
-const BEND_COMPLIANCE = 0.0001;
-const AIR_DENSITY = 1.2;
-const DRAG_COEFF = 0.04;
 
 const PALETTES = [
   { name: 'Indigo Shweshwe',  primary: [0.12, 0.22, 0.55], accent: [0.94, 0.92, 0.86], mid: [0.08, 0.15, 0.40] },
@@ -153,7 +583,7 @@ function ensureAudioCtx() {
     audioCtx = new AudioContext();
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.7;
+    analyser.smoothingTimeConstant = P.audioSmoothing;
     freqData = new Uint8Array(analyser.frequencyBinCount);
   }
   if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -207,7 +637,7 @@ async function toggleMusic() {
     musicAudio = new Audio('https://assets.mixkit.co/music/127/127.mp3');
     musicAudio.crossOrigin = 'anonymous';
     musicAudio.loop = true;
-    musicAudio.volume = 0.5;
+    musicAudio.volume = P.musicVolume;
     musicSource = audioCtx.createMediaElementSource(musicAudio);
     musicSource.connect(analyser);
     analyser.connect(audioCtx.destination);
@@ -369,9 +799,7 @@ function solveConstraint(c, compliance, dt) {
 const ripples = []; // {cx, cy, startTime}
 
 function addRipple(worldPos) {
-  // Convert world pos to grid-relative position
   ripples.push({ cx: worldPos.x, cy: worldPos.y, startTime: time });
-  // Cap active ripples
   if (ripples.length > 5) ripples.shift();
 }
 
@@ -381,26 +809,20 @@ function applyRipples() {
     const elapsed = time - rip.startTime;
     if (elapsed > 3.0) { ripples.splice(ri, 1); continue; }
 
-    const speed = 2.5;
-    const freq = 7.0;
-    const decay = 2.5;
-    const spatialDecay = 1.5;
-    const amplitude = 0.12;
-    const omega = 2 * Math.PI * freq;
+    const omega = 2 * Math.PI * P.rippleFreq;
 
     for (let i = 0; i < numParticles; i++) {
       if (invMass[i] === 0) continue;
       const px = restPos[i*3], py = restPos[i*3+1];
       const r = Math.sqrt((px-rip.cx)**2 + (py-rip.cy)**2);
-      const arrival = r / speed;
+      const arrival = r / P.rippleSpeed;
       const localT = elapsed - arrival;
       if (localT < 0) continue;
 
-      const envelope = amplitude * Math.exp(-decay * localT) * Math.exp(-spatialDecay * r);
+      const envelope = P.rippleAmplitude * Math.exp(-P.rippleDecay * localT) * Math.exp(-P.rippleSpatialDecay * r);
       const wave = envelope * Math.sin(omega * localT);
 
-      // Apply as Z velocity impulse (integrates naturally with XPBD)
-      vel[i*3+2] += wave * 8.0 / SUBSTEPS;
+      vel[i*3+2] += wave * P.rippleImpulse / P.substeps;
     }
   }
 }
@@ -413,10 +835,10 @@ const mouseNDC = new THREE.Vector2();
 let grabbed = -1;
 let grabDepth = 0;
 let isDragging = false;
-let dragMoved = false;  // track if pointer actually moved (vs click)
+let dragMoved = false;
 let dragVelocity = new THREE.Vector3();
 let prevDragPos = new THREE.Vector3();
-let dragTarget = new THREE.Vector3(); // smoothed target position
+let dragTarget = new THREE.Vector3();
 let releaseTime = 0;
 
 const MAX_TRAIL = 600;
@@ -425,11 +847,7 @@ const trailAlphas = new Float32Array(MAX_TRAIL);
 const trailSizes = new Float32Array(MAX_TRAIL);
 let trailHead = 0, trailCount = 0;
 
-const GRAB_RADIUS = 8;
 let grabInfluence = new Map();
-
-// Max displacement per frame — prevents fold-through
-const MAX_DRAG_DISPLACEMENT = 0.04;
 
 function getMouseWorldPos(x, y, depth) {
   const ndc = new THREE.Vector3((x/window.innerWidth)*2-1, -(y/window.innerHeight)*2+1, 0.5);
@@ -451,19 +869,20 @@ function findNearestParticle(worldPos, maxDist) {
 function grabNeighbours(centerIdx) {
   grabInfluence.clear();
   const cr = Math.floor(centerIdx / COLS), cc = centerIdx % COLS;
-  for (let dr = -GRAB_RADIUS; dr <= GRAB_RADIUS; dr++) {
-    for (let dc = -GRAB_RADIUS; dc <= GRAB_RADIUS; dc++) {
+  const gr = Math.round(P.grabRadius);
+  for (let dr = -gr; dr <= gr; dr++) {
+    for (let dc = -gr; dc <= gr; dc++) {
       const r = cr+dr, c = cc+dc;
       if (r<0||r>=ROWS||c<0||c>=COLS) continue;
       const dist = Math.sqrt(dr*dr+dc*dc);
-      if (dist > GRAB_RADIUS) continue;
-      grabInfluence.set(idx(r,c), 0.5*(1+Math.cos(Math.PI*dist/GRAB_RADIUS)));
+      if (dist > gr) continue;
+      grabInfluence.set(idx(r,c), 0.5*(1+Math.cos(Math.PI*dist/gr)));
     }
   }
 }
 
 function onPointerDown(e) {
-  if (e.target.closest('.ctrl-btn')) return;
+  if (e.target.closest('.ctrl-btn') || e.target.closest('#dev-panel')) return;
   const rect = renderer.domElement.getBoundingClientRect();
   mouseNDC.set(((e.clientX-rect.left)/rect.width)*2-1, -((e.clientY-rect.top)/rect.height)*2+1);
   raycaster.setFromCamera(mouseNDC, camera);
@@ -491,7 +910,7 @@ function onPointerMove(e) {
   const worldPos = getMouseWorldPos(e.clientX, e.clientY, grabDepth);
 
   // Lerp target toward mouse (smooth, prevents snapping)
-  dragTarget.lerp(worldPos, 0.35);
+  dragTarget.lerp(worldPos, P.dragLerp);
 
   // Compute clamped displacement from current pos
   let dx = dragTarget.x - pos[grabbed*3];
@@ -500,8 +919,8 @@ function onPointerMove(e) {
   const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
   // Clamp max displacement per frame
-  if (dist > MAX_DRAG_DISPLACEMENT) {
-    const scale = MAX_DRAG_DISPLACEMENT / dist;
+  if (dist > P.maxDragDisplacement) {
+    const scale = P.maxDragDisplacement / dist;
     dx *= scale; dy *= scale; dz *= scale;
   }
 
@@ -529,10 +948,9 @@ function onPointerUp(e) {
     switchPalette();
   } else {
     // Transfer momentum (clamped)
-    const maxThrowSpeed = 15;
-    const throwVel = dragVelocity.clone().multiplyScalar(20);
+    const throwVel = dragVelocity.clone().multiplyScalar(P.throwMultiplier);
     const speed = throwVel.length();
-    if (speed > maxThrowSpeed) throwVel.multiplyScalar(maxThrowSpeed / speed);
+    if (speed > P.maxThrowSpeed) throwVel.multiplyScalar(P.maxThrowSpeed / speed);
 
     for (const [pi, weight] of grabInfluence) {
       vel[pi*3]   += throwVel.x * weight;
@@ -573,8 +991,8 @@ function emitTrailParticles(worldPos, count) {
 function updateTrail(dt) {
   for (let j = 0; j < trailCount; j++) {
     const ti = (trailHead+j) % MAX_TRAIL;
-    trailAlphas[ti] -= dt * 0.4;
-    trailPositions[ti*3+1] += dt * 0.015;
+    trailAlphas[ti] -= dt * P.trailFadeRate;
+    trailPositions[ti*3+1] += dt * P.trailDrift;
     trailPositions[ti*3+2] += (Math.random()-0.5) * dt * 0.01;
   }
   while (trailCount > 0 && trailAlphas[trailHead] <= 0) {
@@ -611,12 +1029,12 @@ let time = 0;
 
 function applyExternalForces(dt) {
   time += dt;
-  const windMult = 1.0 + audioBands.bass * 2.0 + audioBands.subBass * 1.2;
-  const displace = audioBands.subBass * 0.25;
+  const windMult = P.windMultBase + audioBands.bass * P.windMultBass + audioBands.subBass * P.windMultSubBass;
+  const displace = audioBands.subBass * P.displaceSubBass;
 
   for (let i = 0; i < numParticles; i++) {
     if (invMass[i]===0) continue;
-    vel[i*3+1] += GRAVITY * dt * 0.02;
+    vel[i*3+1] += P.gravity * dt * P.gravityDtMult;
     const px=pos[i*3], py=pos[i*3+1], pz=pos[i*3+2], t=time;
 
     const windX = (Math.sin(t*0.3+py*2)*0.15 + Math.sin(t*0.7+pz*1.5)*0.08) * 0.5 * windMult;
@@ -626,9 +1044,9 @@ function applyExternalForces(dt) {
     vel[i*3] += windX*dt; vel[i*3+1] += windY*dt; vel[i*3+2] += windZ*dt;
 
     // Audio breathing
-    vel[i*3+2] += displace * Math.sin(t*2+px*3+py*3) * dt * 40;
+    vel[i*3+2] += displace * Math.sin(t*2+px*3+py*3) * dt * P.breathingMult;
     // Audio sway
-    vel[i*3] += audioBands.lowMid * Math.sin(t*1.5+py*2.5) * dt * 12;
+    vel[i*3] += audioBands.lowMid * Math.sin(t*1.5+py*2.5) * dt * P.swayMult;
   }
 }
 
@@ -652,7 +1070,7 @@ function triDrag(i0,i1,i2,dt) {
   const vDotN=vx*nnx+vy*nny+vz*nnz;
   const speed=Math.sqrt(vx*vx+vy*vy+vz*vz);
   if(speed<1e-8)return;
-  const dm=0.5*AIR_DENSITY*DRAG_COEFF*area*Math.abs(vDotN)*speed;
+  const dm=0.5*P.airDensity*P.dragCoeff*area*Math.abs(vDotN)*speed;
   const fx=-dm*vx/speed/3,fy=-dm*vy/speed/3,fz=-dm*vz/speed/3;
   for(const i of[i0,i1,i2]){vel[i*3]+=fx*dt*invMass[i];vel[i*3+1]+=fy*dt*invMass[i];vel[i*3+2]+=fz*dt*invMass[i];}
 }
@@ -660,9 +1078,8 @@ function triDrag(i0,i1,i2,dt) {
 // Rest return — ramps up stiffness after release
 function applyRestReturn(dt) {
   if (isDragging) return;
-  // Ramp: stronger over time since last release (up to max)
   const timeSinceRelease = time - releaseTime;
-  const rampedK = Math.min(0.25, 0.04 + timeSinceRelease * 0.08);
+  const rampedK = Math.min(P.restReturnMaxK, P.restReturnMinK + timeSinceRelease * P.restReturnRamp);
 
   for (let i = 0; i < numParticles; i++) {
     if (invMass[i]===0) continue;
@@ -673,13 +1090,12 @@ function applyRestReturn(dt) {
   }
 }
 
-// Velocity clamping — prevents extreme speeds
+// Velocity clamping
 function clampVelocities() {
-  const maxSpeed = 8.0;
   for (let i = 0; i < numParticles; i++) {
     const speed = Math.sqrt(vel[i*3]**2 + vel[i*3+1]**2 + vel[i*3+2]**2);
-    if (speed > maxSpeed) {
-      const s = maxSpeed / speed;
+    if (speed > P.velClampSpeed) {
+      const s = P.velClampSpeed / speed;
       vel[i*3]*=s; vel[i*3+1]*=s; vel[i*3+2]*=s;
     }
   }
@@ -689,16 +1105,15 @@ function applyCentring() {
   let cx=0,cy=0,cz=0;
   for(let i=0;i<numParticles;i++){cx+=pos[i*3];cy+=pos[i*3+1];cz+=pos[i*3+2];}
   cx/=numParticles;cy/=numParticles;cz/=numParticles;
-  const k=0.003;
   for(let i=0;i<numParticles;i++){
-    pos[i*3]-=cx*k;pos[i*3+1]-=cy*k;pos[i*3+2]-=cz*k;
-    prevPos[i*3]-=cx*k;prevPos[i*3+1]-=cy*k;prevPos[i*3+2]-=cz*k;
+    pos[i*3]-=cx*P.centringK;pos[i*3+1]-=cy*P.centringK;pos[i*3+2]-=cz*P.centringK;
+    prevPos[i*3]-=cx*P.centringK;prevPos[i*3+1]-=cy*P.centringK;prevPos[i*3+2]-=cz*P.centringK;
   }
 }
 
 function simulate() {
-  const dt = 1/60/SUBSTEPS;
-  for (let sub = 0; sub < SUBSTEPS; sub++) {
+  const dt = 1/60/P.substeps;
+  for (let sub = 0; sub < P.substeps; sub++) {
     applyExternalForces(dt);
     applyAeroDrag(dt);
     applyRestReturn(dt);
@@ -706,14 +1121,14 @@ function simulate() {
 
     for (let i=0;i<numParticles;i++) {
       if(invMass[i]===0)continue;
-      vel[i*3]*=DAMPING;vel[i*3+1]*=DAMPING;vel[i*3+2]*=DAMPING;
+      vel[i*3]*=P.damping;vel[i*3+1]*=P.damping;vel[i*3+2]*=P.damping;
       prevPos[i*3]=pos[i*3];prevPos[i*3+1]=pos[i*3+1];prevPos[i*3+2]=pos[i*3+2];
       pos[i*3]+=vel[i*3]*dt;pos[i*3+1]+=vel[i*3+1]*dt;pos[i*3+2]+=vel[i*3+2]*dt;
     }
 
-    for(let iter=0;iter<ITERATIONS;iter++){
-      for(const c of distConstraints) solveConstraint(c,STRETCH_COMPLIANCE,dt);
-      for(const c of bendConstraints) solveConstraint(c,BEND_COMPLIANCE,dt);
+    for(let iter=0;iter<P.iterations;iter++){
+      for(const c of distConstraints) solveConstraint(c,P.stretchCompliance,dt);
+      for(const c of bendConstraints) solveConstraint(c,P.bendCompliance,dt);
     }
 
     for(let i=0;i<numParticles;i++){
@@ -728,7 +1143,7 @@ function simulate() {
 }
 
 // ═══════════════════════════════════════════════
-// TEXTURE GEN (unchanged)
+// TEXTURE GEN
 // ═══════════════════════════════════════════════
 const TEX_SIZE = 1024;
 
@@ -850,8 +1265,10 @@ let diffuseMap=generateShweshweTexture(), normalMap=generateWeaveNormalMap();
 const material=new THREE.ShaderMaterial({
   vertexShader:fabricVS, fragmentShader:fabricFS,
   uniforms:{u_diffuseMap:{value:diffuseMap},u_normalMap:{value:normalMap},
-    u_lightDir1:{value:new THREE.Vector3(0.6,0.8,0.5).normalize()},u_lightDir2:{value:new THREE.Vector3(-0.5,0.3,-0.8).normalize()},
-    u_lightCol1:{value:new THREE.Vector3(1,0.95,0.9)},u_lightCol2:{value:new THREE.Vector3(0.3,0.35,0.5)},
+    u_lightDir1:{value:new THREE.Vector3(P.light1X,P.light1Y,P.light1Z).normalize()},
+    u_lightDir2:{value:new THREE.Vector3(P.light2X,P.light2Y,P.light2Z).normalize()},
+    u_lightCol1:{value:new THREE.Vector3(P.light1R,P.light1G,P.light1B)},
+    u_lightCol2:{value:new THREE.Vector3(P.light2R,P.light2G,P.light2B)},
     u_cameraPos:{value:new THREE.Vector3()},u_time:{value:0},u_audioSheen:{value:0},u_audioWarmth:{value:0},u_audioSparkle:{value:0}},
   side:THREE.DoubleSide,
 });
@@ -894,8 +1311,12 @@ function animate(){
   trailGeo.attributes.alpha.needsUpdate=true;
   trailGeo.setDrawRange(0,trailCount);
 
-  const camR=5.0,camS=0.12,aCP=audioBands.bass*0.3;
-  camera.position.set(Math.sin(t*camS)*(camR+aCP),Math.sin(t*camS*0.7)*0.8+0.3,Math.cos(t*camS)*(camR+aCP));
+  const aCP=audioBands.bass*P.camAudioPush;
+  camera.position.set(
+    Math.sin(t*P.camSpeed)*(P.camRadius+aCP),
+    Math.sin(t*P.camSpeed*0.7)*P.camVertAmp+P.camVertOffset,
+    Math.cos(t*P.camSpeed)*(P.camRadius+aCP)
+  );
   camera.lookAt(0,0,0);
 
   material.uniforms.u_cameraPos.value.copy(camera.position);
@@ -904,12 +1325,18 @@ function animate(){
   material.uniforms.u_audioWarmth.value=audioBands.mid;
   material.uniforms.u_audioSparkle.value=audioBands.highMid;
 
-  const l1=material.uniforms.u_lightDir1.value;
-  l1.set(0.6+Math.sin(t*0.2)*0.3,0.8,0.5+Math.cos(t*0.15)*0.3).normalize();
+  // Update light directions and colours from P
+  material.uniforms.u_lightDir1.value.set(P.light1X+Math.sin(t*0.2)*0.3, P.light1Y, P.light1Z+Math.cos(t*0.15)*0.3).normalize();
+  material.uniforms.u_lightDir2.value.set(P.light2X, P.light2Y, P.light2Z).normalize();
+  material.uniforms.u_lightCol1.value.set(P.light1R, P.light1G, P.light1B);
+  material.uniforms.u_lightCol2.value.set(P.light2R, P.light2G, P.light2B);
 
   const pp=ambientPts.geometry.attributes.position.array;
   for(let i=0;i<aC;i++){pp[i*3+1]+=0.001;if(pp[i*3+1]>5)pp[i*3+1]=-5;}
   ambientPts.geometry.attributes.position.needsUpdate=true;
+
+  // Update band meters in dev panel
+  updateBandMeters();
 
   renderer.render(scene,camera);
 }
