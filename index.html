@@ -2276,18 +2276,16 @@ function animate(){
   trailGeo.attributes.alpha.needsUpdate=true;
   trailGeo.setDrawRange(0,trailCount);
 
-  // === CAMERA — bass pushes radius, sub-bass breathes FOV, onset shakes ===
+  // === CAMERA — fixed position, no orbit. Audio-reactive push, FOV breathing, kick shake ===
   const aCP = audioBands.bass * P.camAudioPush;
-  const subBreath = audioBands.subBass * 1.2; // was 0.8 → 1.2 (FOV breathing)
-  const camShake = audioOnsets.bass * 0.06; // was 0.04 → 0.06 (kick camera punch)
-  // Low-mid → gentle orbit speed modulation (more energy = slightly faster orbit)
-  const orbitBoost = audioBands.lowMid * 0.03;
+  const subBreath = audioBands.subBass * 1.2;
+  const camShake = audioOnsets.bass * 0.06;
   camera.position.set(
-    Math.sin(t*(P.camSpeed+orbitBoost))*(P.camRadius+aCP) + camShake*Math.sin(t*37),
-    Math.sin(t*(P.camSpeed+orbitBoost)*0.7)*P.camVertAmp+P.camVertOffset + camShake*Math.cos(t*41),
-    Math.cos(t*(P.camSpeed+orbitBoost))*(P.camRadius+aCP)
+    camShake*Math.sin(t*37),
+    P.camVertOffset + camShake*Math.cos(t*41),
+    P.camRadius + aCP
   );
-  camera.fov = 45 + subBreath * 4; // was *3 → *4 (stronger FOV breathing)
+  camera.fov = 45 + subBreath * 4;
   camera.updateProjectionMatrix();
   camera.lookAt(0,0,0);
 
