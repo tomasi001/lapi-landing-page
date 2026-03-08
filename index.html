@@ -81,6 +81,32 @@
   #mic-btn { left: 10rem; }
   #dev-btn { left: 17rem; }
 
+  /* MODE BAR */
+  #mode-bar {
+    position: fixed;
+    bottom: 3.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 0.3rem;
+    z-index: 10;
+  }
+  .mode-btn {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.6rem;
+    color: var(--fg30);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    padding: 0.35rem 0.7rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    border-radius: 3px;
+  }
+  .mode-btn:hover { background: var(--fg10); color: var(--fg50); }
+  .mode-btn.active { color: var(--accent); border-color: var(--accent); opacity: 0.7; }
+
   /* THEME TOGGLE — pill-shaped animated switch */
   #theme-toggle {
     position: fixed;
@@ -293,6 +319,12 @@
 </head>
 <body>
 <div id="info">click: ripple + palette &middot; drag: pull cloth &middot; music auto-plays</div>
+<div id="mode-bar">
+  <button class="mode-btn active" data-mode="0">Ambient</button>
+  <button class="mode-btn" data-mode="1">Flow</button>
+  <button class="mode-btn" data-mode="2">Groove</button>
+  <button class="mode-btn" data-mode="3">Disco</button>
+</div>
 <div id="palette-name"></div>
 <button class="ctrl-btn" id="music-btn">&#9654; music</button>
 <button class="ctrl-btn" id="mic-btn">mic off</button>
@@ -422,6 +454,116 @@ const P = {
   furAudioReact: 2,
   furWind: 0,
 };
+
+// ═══════════════════════════════════════════════
+// MODE SYSTEM — 4 energies, 4 songs
+// ═══════════════════════════════════════════════
+const MODES = [
+  {
+    name: 'Ambient',
+    // Calm, slow, meditative — gentle floating cloth
+    song: 'https://assets.mixkit.co/music/1226/1226.mp3',
+    beatPaletteSwap: false,
+    overrides: {
+      camSpeed: 0.02, windMultBase: 0.2, windMultBass: 2,
+      breathingMult: 15, swayMult: 0, rippleAmplitude: 0.15,
+      rippleImpulse: 12, furWind: 0, furAudioReact: 0.5,
+    },
+  },
+  {
+    name: 'Flow',
+    // Mid-tempo, smooth movement — the default energy
+    song: 'https://assets.mixkit.co/music/127/127.mp3',
+    beatPaletteSwap: false,
+    overrides: {
+      camSpeed: 0.04, windMultBase: 0.5, windMultBass: 4.7,
+      breathingMult: 32, swayMult: 0, rippleAmplitude: 0.35,
+      rippleImpulse: 27.5, furWind: 0, furAudioReact: 2,
+    },
+  },
+  {
+    name: 'Groove',
+    // Upbeat, energetic — cloth moves with purpose
+    song: 'https://assets.mixkit.co/music/1178/1178.mp3',
+    beatPaletteSwap: false,
+    overrides: {
+      camSpeed: 0.1, windMultBase: 1.2, windMultBass: 6,
+      breathingMult: 50, swayMult: 8, rippleAmplitude: 0.4,
+      rippleImpulse: 30, furWind: 0.4, furAudioReact: 2,
+    },
+  },
+  {
+    name: 'Disco',
+    // 4-on-the-floor, high energy — palette swaps on beat
+    song: 'https://assets.mixkit.co/music/1140/1140.mp3',
+    beatPaletteSwap: true,
+    overrides: {
+      camSpeed: 0.14, windMultBase: 1.5, windMultBass: 8,
+      breathingMult: 65, swayMult: 15, rippleAmplitude: 0.45,
+      rippleImpulse: 30, furWind: 0.6, furAudioReact: 2,
+    },
+  },
+];
+
+let currentMode = 0;
+let beatCooldown = 0; // prevents double-triggering palette swap
+let lastBassEnergy = 0;
+const BEAT_THRESHOLD = 0.45; // bass energy jump that counts as a beat
+const BEAT_COOLDOWN_MS = 350; // min time between beat-triggered swaps
+
+function applyMode(modeIdx, startPlaying = false) {
+  currentMode = modeIdx;
+  const mode = MODES[modeIdx];
+
+  // Apply param overrides (these layer on top of current P values)
+  for (const [key, val] of Object.entries(mode.overrides)) {
+    P[key] = val;
+    syncUI(key, val);
+  }
+
+  // Update mode button UI
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.mode) === modeIdx);
+  });
+
+  // Switch song if music is playing or startPlaying requested
+  if (musicAudio && (musicPlaying || startPlaying)) {
+    const wasPlaying = musicPlaying;
+    musicAudio.pause();
+    musicAudio.src = mode.song;
+    musicAudio.load();
+    if (wasPlaying || startPlaying) {
+      musicAudio.play().catch(() => {});
+      musicPlaying = true;
+      audioActive = true;
+      document.getElementById('music-btn').classList.add('active');
+      document.getElementById('music-btn').innerHTML = '&#9646;&#9646; music';
+    }
+  }
+}
+
+// Beat detection — checks for bass energy spikes
+function detectBeat(dt) {
+  if (!MODES[currentMode].beatPaletteSwap) return;
+  if (beatCooldown > 0) { beatCooldown -= dt * 1000; return; }
+
+  const bassNow = audioBands.bass;
+  const jump = bassNow - lastBassEnergy;
+  lastBassEnergy = bassNow;
+
+  if (jump > BEAT_THRESHOLD && bassNow > 0.3) {
+    switchPalette();
+    beatCooldown = BEAT_COOLDOWN_MS;
+  }
+}
+
+// Wire mode buttons
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    applyMode(parseInt(btn.dataset.mode), true);
+  });
+});
 
 // ═══════════════════════════════════════════════
 // DEV PANEL — slider definitions
@@ -1067,7 +1209,7 @@ async function toggleMusic() {
   }
 
   if (!musicAudio) {
-    musicAudio = new Audio('https://assets.mixkit.co/music/127/127.mp3');
+    musicAudio = new Audio(MODES[currentMode].song);
     musicAudio.crossOrigin = 'anonymous';
     musicAudio.loop = true;
     musicAudio.volume = P.musicVolume;
@@ -2029,6 +2171,7 @@ function animate(){
 
   // Update band meters in dev panel
   updateFurUniforms();
+  detectBeat(dt);
   updateBandMeters();
 
   renderer.render(scene,camera);
