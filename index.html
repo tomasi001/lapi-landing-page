@@ -461,8 +461,8 @@ const P = {
 const MODES = [
   {
     name: 'Ambient',
-    // Calm, slow, meditative — gentle floating cloth
-    song: 'https://assets.mixkit.co/music/1226/1226.mp3',
+    // Deep, atmospheric, textural drone — Brian Eno meets SA ambient
+    song: 'https://archive.org/download/dronemusic/02-DroneInD.mp3',
     beatPaletteSwap: false,
     overrides: {
       camSpeed: 0.02, windMultBase: 0.2, windMultBass: 2,
@@ -472,8 +472,8 @@ const MODES = [
   },
   {
     name: 'Flow',
-    // Mid-tempo, smooth movement — the default energy
-    song: 'https://assets.mixkit.co/music/127/127.mp3',
+    // Downtempo, organic, flowing — Bonobo/Tycho territory
+    song: 'https://archive.org/download/DWK315/02_-_Anitek_-_So_Far.mp3',
     beatPaletteSwap: false,
     overrides: {
       camSpeed: 0.04, windMultBase: 0.5, windMultBass: 4.7,
@@ -483,8 +483,8 @@ const MODES = [
   },
   {
     name: 'Groove',
-    // Upbeat, energetic — cloth moves with purpose
-    song: 'https://assets.mixkit.co/music/1178/1178.mp3',
+    // Afrocentric rhythmic electronic — percussive, tribal
+    song: 'https://archive.org/download/DWK063/Twin_Muses_-_02_-_Dirt.mp3',
     beatPaletteSwap: false,
     overrides: {
       camSpeed: 0.1, windMultBase: 1.2, windMultBass: 6,
@@ -494,8 +494,8 @@ const MODES = [
   },
   {
     name: 'Disco',
-    // 4-on-the-floor, high energy — palette swaps on beat
-    song: 'https://assets.mixkit.co/music/1140/1140.mp3',
+    // Minimal techno, 4-on-the-floor — underground Berlin club
+    song: 'https://archive.org/download/ttr023/ttr023_djoker_04_transponder_tooltech_remix.mp3',
     beatPaletteSwap: true,
     overrides: {
       camSpeed: 0.14, windMultBase: 1.5, windMultBass: 8,
@@ -506,10 +506,11 @@ const MODES = [
 ];
 
 let currentMode = 0;
-let beatCooldown = 0; // prevents double-triggering palette swap
+let beatCooldown = 0;
 let lastBassEnergy = 0;
-const BEAT_THRESHOLD = 0.45; // bass energy jump that counts as a beat
-const BEAT_COOLDOWN_MS = 350; // min time between beat-triggered swaps
+let beatCount = 0; // count beats, swap palette every 4
+const BEAT_THRESHOLD = 0.35; // bass energy jump that counts as a beat
+const BEAT_COOLDOWN_MS = 280; // min ms between detected beats
 
 function applyMode(modeIdx, startPlaying = false) {
   currentMode = modeIdx;
@@ -542,18 +543,23 @@ function applyMode(modeIdx, startPlaying = false) {
   }
 }
 
-// Beat detection — checks for bass energy spikes
+// Beat detection — counts 4 beats then swaps palette (every bar in 4/4)
 function detectBeat(dt) {
-  if (!MODES[currentMode].beatPaletteSwap) return;
-  if (beatCooldown > 0) { beatCooldown -= dt * 1000; return; }
+  if (!MODES[currentMode].beatPaletteSwap) { beatCount = 0; return; }
+  if (beatCooldown > 0) { beatCooldown -= dt * 1000; }
 
   const bassNow = audioBands.bass;
   const jump = bassNow - lastBassEnergy;
   lastBassEnergy = bassNow;
 
-  if (jump > BEAT_THRESHOLD && bassNow > 0.3) {
-    switchPalette();
+  if (beatCooldown <= 0 && jump > BEAT_THRESHOLD && bassNow > 0.25) {
+    beatCount++;
     beatCooldown = BEAT_COOLDOWN_MS;
+    // Swap palette every 4 beats (one bar of 4/4)
+    if (beatCount >= 4) {
+      switchPalette();
+      beatCount = 0;
+    }
   }
 }
 
@@ -1178,13 +1184,15 @@ function updateAudio(dt) {
   if (!audioActive || !analyser) return;
   analyser.getByteFrequencyData(freqData);
 
+  // 1.25x reactivity boost across all bands
+  const boost = 1.25;
   const raw = {
-    subBass: Math.pow(getBandEnergy(freqData, 20, 60), 1.5),
-    bass:    Math.pow(getBandEnergy(freqData, 60, 250), 1.4),
-    lowMid:  Math.pow(getBandEnergy(freqData, 250, 500), 1.3),
-    mid:     Math.pow(getBandEnergy(freqData, 500, 2000), 1.3),
-    highMid: Math.pow(getBandEnergy(freqData, 2000, 6000), 1.2),
-    high:    Math.pow(getBandEnergy(freqData, 6000, 20000), 1.2),
+    subBass: Math.min(1, Math.pow(getBandEnergy(freqData, 20, 60), 1.5) * boost),
+    bass:    Math.min(1, Math.pow(getBandEnergy(freqData, 60, 250), 1.4) * boost),
+    lowMid:  Math.min(1, Math.pow(getBandEnergy(freqData, 250, 500), 1.3) * boost),
+    mid:     Math.min(1, Math.pow(getBandEnergy(freqData, 500, 2000), 1.3) * boost),
+    highMid: Math.min(1, Math.pow(getBandEnergy(freqData, 2000, 6000), 1.2) * boost),
+    high:    Math.min(1, Math.pow(getBandEnergy(freqData, 6000, 20000), 1.2) * boost),
   };
   for (const band in raw) {
     audioBands[band] = bandFilters[band].filter(raw[band], dt);
