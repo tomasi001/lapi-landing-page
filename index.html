@@ -500,9 +500,9 @@ const PARAM_DEFS = {
   'Fur': [
     { key: 'furEnabled',    min: 0,    max: 1,    step: 1,     tip: 'Toggle fur on (1) or off (0). Turn off to save GPU when not needed.' },
     { key: 'furLength',     min: 0,    max: 0.2,  step: 0.005, tip: 'How long the fur strands are. 0 = bald, higher = big fluffy puffball.' },
-    { key: 'furDensity',    min: 10,   max: 2000, step: 10,    tip: 'How many strands per unit area. Higher = thicker, denser fur. 500+ = cloth-like, 1000+ = plush.' },
+    { key: 'furDensity',    min: 10,   max: 4000, step: 10,    tip: 'How many strands per unit area. Higher = thicker, denser fur. 500+ = cloth-like, 1000+ = plush.' },
     { key: 'furShells',     min: 5,    max: 50,   step: 1,     tip: 'Number of transparent layers used to render the fur. More = smoother but heavier on GPU.' },
-    { key: 'furThickness',  min: 0.1,  max: 1.0,  step: 0.01,  tip: 'Base thickness of each strand. Higher = fatter, more visible strands. Lower = wispy thin hairs.' },
+    { key: 'furThickness',  min: 0.1,  max: 2.4,  step: 0.01,  tip: 'Base thickness of each strand. Higher = fatter, more visible strands. Lower = wispy thin hairs.' },
     { key: 'furCurl',       min: 0,    max: 1,    step: 0.05,  tip: 'How curly the fur is. 0 = straight strands, 1 = tight curls. Makes it feel more organic.' },
     { key: 'furGravity',    min: 0,    max: 0.5,  step: 0.01,  tip: 'How much gravity pulls the fur tips downward. Gives weight and drape to the strands.' },
     { key: 'furTipFade',    min: 0,    max: 1,    step: 0.05,  tip: 'How much the fur tips lighten/brighten compared to the roots. Creates depth and softness.' },
@@ -960,8 +960,8 @@ const PALETTES = [
   { name: 'Karoo Red',        primary: [0.58, 0.12, 0.10], accent: [0.94, 0.91, 0.85], mid: [0.42, 0.08, 0.07] },
 ];
 
-let paletteIdx = 0;
-let palette = PALETTES[0];
+let paletteIdx = 1;
+let palette = PALETTES[1];
 
 // ═══════════════════════════════════════════════
 // ONE-EURO FILTER
@@ -1740,7 +1740,7 @@ const furShellVS = `
 uniform float u_shellSigned, u_halfShells, u_furLength, u_furCurl, u_furGravity, u_furWind, u_furAudioReact;
 uniform float u_time, u_audioBass, u_audioSubBass;
 attribute vec3 tangent_attr;
-varying vec3 vNormal, vWorldPos;
+varying vec3 vNormal, vWorldPos, vTangent;
 varying vec2 vUv;
 varying float vAbsT; // 0 at surface, 1 at tip (same for both sides)
 varying float vSign; // +1 or -1 side
@@ -1752,17 +1752,14 @@ vec3 hash3(vec3 p) {
 
 void main() {
   vUv = uv;
-  // u_shellSigned: -halfShells .. -1, 0, 1 .. halfShells
-  // Normalise to -1..+1 range, then split into sign and abs
   float t = u_shellSigned / max(1.0, u_halfShells);
   vSign = sign(t);
   vAbsT = abs(t);
   vNormal = normalize(normalMatrix * normal);
+  // Pass strand direction (normal = strand axis) for Kajiya-Kay
+  vTangent = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
 
-  // Offset along normal (positive or negative side)
   float height = t * u_furLength;
-
-  // Effects scale with distance from surface (absT)
   float absT = vAbsT;
   vec3 curlOff = hash3(position * 50.0 + u_time * 0.3) * u_furCurl * absT * absT * u_furLength * 0.5;
   vec3 gravOff = vec3(0.0, -1.0, 0.0) * u_furGravity * absT * absT * u_furLength;
@@ -1771,7 +1768,6 @@ void main() {
   vec3 windOff = vec3(sin(wp)*0.5, 0.0, cos(wp*0.7)*0.3) * u_furWind * absT * u_furLength;
 
   float puff = (u_audioBass * 0.6 + u_audioSubBass * 0.4) * u_furAudioReact * absT;
-  // Puff goes outward on each side
   float puffHeight = vSign * puff * u_furLength * 0.5;
 
   vec3 displaced = position + normal * (height + puffHeight) + curlOff + gravOff + windOff;
@@ -1785,15 +1781,21 @@ precision highp float;
 uniform sampler2D u_diffuseMap;
 uniform float u_furDensity, u_furTipFade, u_furThickness, u_time;
 uniform vec3 u_lightDir1, u_lightCol1, u_lightDir2, u_lightCol2, u_cameraPos;
-varying vec3 vNormal, vWorldPos;
+varying vec3 vNormal, vWorldPos, vTangent;
 varying vec2 vUv;
-varying float vAbsT; // 0=surface, 1=tip
-varying float vSign; // which side
+varying float vAbsT;
+varying float vSign;
 
 float hash1(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
+// Kajiya-Kay anisotropic specular — industry standard for hair/fur
+float kajiyaKay(vec3 T, vec3 H, float exp) {
+  float TdotH = dot(T, H);
+  float sinTH = sqrt(max(0.0, 1.0 - TdotH * TdotH));
+  return pow(sinTH, exp);
+}
+
 void main() {
-  // Surface shell (absT ~ 0) — skip, fabric shader handles it
   if (vAbsT < 0.02) discard;
 
   // Strand grid
@@ -1806,39 +1808,79 @@ void main() {
   vec2 center = vec2(h1, h2) * 0.6 + 0.2;
   float dist = length(f - center);
 
-  // Per-strand random max height
   float strandMaxH = 0.25 + hash1(cell * 3.17) * 0.75;
   if (vAbsT > strandMaxH) discard;
 
-  float tNorm = vAbsT / strandMaxH; // 0=root, 1=tip
+  float tNorm = vAbsT / strandMaxH;
 
-  // Strand radius tapers toward tip — u_furThickness controls base width
   float radius = u_furThickness * (1.0 - tNorm * 0.85);
   if (dist > radius) discard;
 
   float edgeAlpha = smoothstep(radius, radius * 0.1, dist);
 
-  vec3 col = texture2D(u_diffuseMap, vUv).rgb;
-  col *= 1.0 + tNorm * u_furTipFade * 0.8;
+  // Base colour from texture + tip fade
+  vec3 baseCol = texture2D(u_diffuseMap, vUv).rgb;
+  baseCol *= 1.0 + tNorm * u_furTipFade * 0.8;
 
-  // Normal always faces camera on whichever side the shell is on
+  // Per-strand colour variation for richness
+  float colVar = hash1(cell * 7.31) * 0.15 - 0.075;
+  baseCol *= 1.0 + colVar;
+
+  // Geometry setup — strand tangent (along fur axis = surface normal direction)
+  vec3 T = normalize(vTangent) * vSign;
   vec3 N = normalize(vNormal) * vSign;
   vec3 V = normalize(u_cameraPos - vWorldPos);
-  // If normal points away from camera, flip it
-  if (dot(N, V) < 0.0) N = -N;
+  if (dot(N, V) < 0.0) { N = -N; T = -T; }
 
-  float d1 = dot(N, normalize(u_lightDir1)) * 0.5 + 0.5;
-  float d2 = dot(N, normalize(u_lightDir2)) * 0.5 + 0.5;
-  col *= (d1 * u_lightCol1 + d2 * u_lightCol2) * 0.75;
+  vec3 L1 = normalize(u_lightDir1);
+  vec3 L2 = normalize(u_lightDir2);
 
-  // AO — dark at roots, bright at tips
-  col *= 0.3 + 0.7 * tNorm;
+  // === DIFFUSE: wrap lighting for soft fur look ===
+  float wrap = 0.5;
+  float diff1 = max(0.0, (dot(N, L1) + wrap) / (1.0 + wrap));
+  float diff2 = max(0.0, (dot(N, L2) + wrap) / (1.0 + wrap));
 
-  // Rim glow
-  float rim = pow(1.0 - max(dot(N, V), 0.0), 2.5);
-  col += rim * (u_lightCol1 * 0.3 + u_lightCol2 * 0.15);
+  // === KAJIYA-KAY SPECULAR: dual-lobe (primary tight + secondary wide) ===
+  vec3 H1 = normalize(L1 + V);
+  vec3 H2 = normalize(L2 + V);
 
-  float alpha = edgeAlpha * (1.0 - tNorm * 0.55) * 0.85;
+  // Primary specular — sharp highlight, slightly shifted
+  float spec1a = kajiyaKay(T, H1, 80.0) * 0.6;
+  float spec1b = kajiyaKay(T, H2, 80.0) * 0.4;
+  // Secondary specular — broader, coloured by base
+  float spec2a = kajiyaKay(T, H1, 20.0) * 0.35;
+  float spec2b = kajiyaKay(T, H2, 20.0) * 0.25;
+
+  // === FORWARD SCATTERING (Marschner TT-like) ===
+  // Light passing through thin strands — visible when backlit
+  float scatter1 = pow(max(0.0, dot(V, -L1)), 4.0) * 0.3;
+  float scatter2 = pow(max(0.0, dot(V, -L2)), 4.0) * 0.2;
+  vec3 scatterCol = baseCol * 1.3; // transmitted light picks up strand colour
+
+  // === AMBIENT OCCLUSION: dark at roots, bright at tips ===
+  float ao = 0.25 + 0.75 * tNorm;
+
+  // === RIM / FRESNEL ===
+  float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+
+  // Combine
+  vec3 col = vec3(0.0);
+  // Diffuse
+  col += baseCol * (diff1 * u_lightCol1 + diff2 * u_lightCol2) * 0.7;
+  // Primary specular (white highlight)
+  col += (spec1a * u_lightCol1 + spec1b * u_lightCol2) * 0.4;
+  // Secondary specular (tinted by base colour for warmth)
+  col += baseCol * (spec2a * u_lightCol1 + spec2b * u_lightCol2) * 0.3;
+  // Forward scatter
+  col += scatterCol * (scatter1 * u_lightCol1 + scatter2 * u_lightCol2);
+  // AO
+  col *= ao;
+  // Rim
+  col += rim * (u_lightCol1 * 0.2 + u_lightCol2 * 0.1) * 0.5;
+  // Ambient floor so roots aren't pure black
+  col += baseCol * 0.06;
+
+  float alpha = edgeAlpha * (1.0 - tNorm * 0.5) * 0.88;
 
   gl_FragColor = vec4(col, alpha);
 }`;
