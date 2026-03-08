@@ -1658,32 +1658,50 @@ uniform sampler2D u_diffuseMap,u_normalMap; uniform vec3 u_lightDir1,u_lightDir2
 uniform float u_time,u_audioSheen,u_audioWarmth,u_audioSparkle;
 varying vec3 vNormal,vWorldPos,vTangent,vBitangent; varying vec2 vUv;
 
-float anisoSpec(vec3 T,vec3 H,float e){float t=dot(T,H);return pow(sqrt(max(0.,1.-t*t)),e);}
-float fresnel(float c,float f){return f+(1.-f)*pow(1.-c,5.);}
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 
 void main(){
-  vec4 dTex=texture2D(u_diffuseMap,vUv); dTex.rgb+=vec3(0.08,0.03,-0.02)*u_audioWarmth;
+  vec4 dTex=texture2D(u_diffuseMap,vUv); dTex.rgb+=vec3(0.06,0.025,-0.015)*u_audioWarmth;
   vec3 nm=texture2D(u_normalMap,vUv).xyz*2.-1.;
-  // Flip normal, tangent, bitangent for back faces so both sides light identically
+
+  // Flip for back faces — both sides see identical geometry
   float facing=gl_FrontFacing?1.0:-1.0;
   vec3 fNormal=normalize(vNormal)*facing, fTangent=normalize(vTangent)*facing, fBitangent=normalize(vBitangent)*facing;
   mat3 TBN=mat3(fTangent,fBitangent,fNormal);
-  vec3 N=normalize(TBN*nm),V=normalize(u_cameraPos-vWorldPos); float NdV=max(dot(N,V),0.);
-  vec3 wT=fTangent,fT=fBitangent,color=vec3(0);
-  vec3 L[2]; L[0]=normalize(u_lightDir1); L[1]=normalize(u_lightDir2);
-  vec3 LC[2]; LC[0]=u_lightCol1; LC[1]=u_lightCol2;
-  for(int l=0;l<2;l++){
-    vec3 H=normalize(L[l]+V); float w=0.35; float diff=max(0.,(dot(N,L[l])+w)/(1.+w));
-    float sW=anisoSpec(wT,H,40.)*0.35,sF=anisoSpec(fT,H,30.)*0.25,F=fresnel(NdV,0.04);
-    float sh=pow(1.-NdV,3.)*(0.15+u_audioSheen*0.35);
-    float tr=max(0.,dot(V,-L[l]))*0.12;
-    color+=LC[l]*(dTex.rgb*diff*0.85+(sW+sF)*F*LC[l]+sh*dTex.rgb*1.5+dTex.rgb*vec3(1.2,0.9,0.8)*tr);
-  }
-  color+=dTex.rgb*vec3(0.04,0.05,0.07)+pow(1.-NdV,4.)*vec3(0.05,0.08,0.12);
-  if(u_audioSparkle>0.05){vec2 sUV=floor(vUv*200.);float sv=hash(sUV+floor(u_time*3.));float th=1.-u_audioSparkle*0.3;
-  if(sv>th){float in2=(sv-th)/(1.-th);float sa=hash(sUV*1.7);float vf=pow(abs(sin(sa*6.28+dot(V,N)*3.)),4.);
-  color+=vec3(1,.95,.85)*in2*vf*u_audioSparkle*0.6;}}
+  vec3 N=normalize(TBN*nm);
+  vec3 V=normalize(u_cameraPos-vWorldPos);
+
+  // === SOFT DIFFUSE LIGHTING — view-independent, symmetric both sides ===
+  // Use absolute dot product so light wraps identically regardless of face
+  vec3 L1=normalize(u_lightDir1), L2=normalize(u_lightDir2);
+
+  // Wide wrap diffuse — very soft falloff, no harsh shadows
+  float wrap=0.6;
+  float d1=max(0.,(abs(dot(N,L1))+wrap)/(1.+wrap));
+  float d2=max(0.,(abs(dot(N,L2))+wrap)/(1.+wrap));
+
+  // Soft hemisphere ambient — average of both lights
+  vec3 hemiAmb=(u_lightCol1+u_lightCol2)*0.12;
+
+  vec3 color=vec3(0);
+  // Warm diffuse — multiply by texture colour
+  color+=dTex.rgb*(d1*u_lightCol1*0.65+d2*u_lightCol2*0.55);
+  // Hemisphere ambient
+  color+=dTex.rgb*hemiAmb;
+
+  // Subtle fabric sheen (audio-reactive, kept very low to avoid reflective look)
+  float NdV=max(abs(dot(N,V)),0.001);
+  float sheen=pow(1.-NdV,4.)*(0.04+u_audioSheen*0.08);
+  color+=dTex.rgb*sheen*0.5;
+
+  // Warm ambient floor — prevent any face going too dark
+  color+=dTex.rgb*vec3(0.06,0.055,0.05);
+
+  // Audio sparkles (subtle)
+  if(u_audioSparkle>0.05){vec2 sUV=floor(vUv*200.);float sv=hash(sUV+floor(u_time*3.));float th=1.-u_audioSparkle*0.25;
+  if(sv>th){float in2=(sv-th)/(1.-th);float sa=hash(sUV*1.7);
+  color+=vec3(1,.97,.9)*in2*u_audioSparkle*0.25;}}
+
   gl_FragColor=vec4(color,1);
 }`;
 
@@ -1788,13 +1806,6 @@ varying float vSign;
 
 float hash1(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
-// Kajiya-Kay anisotropic specular — industry standard for hair/fur
-float kajiyaKay(vec3 T, vec3 H, float exp) {
-  float TdotH = dot(T, H);
-  float sinTH = sqrt(max(0.0, 1.0 - TdotH * TdotH));
-  return pow(sinTH, exp);
-}
-
 void main() {
   if (vAbsT < 0.02) discard;
 
@@ -1818,67 +1829,43 @@ void main() {
 
   float edgeAlpha = smoothstep(radius, radius * 0.1, dist);
 
-  // Base colour from texture + tip fade
+  // Base colour + tip fade + per-strand variation
   vec3 baseCol = texture2D(u_diffuseMap, vUv).rgb;
   baseCol *= 1.0 + tNorm * u_furTipFade * 0.8;
-
-  // Per-strand colour variation for richness
-  float colVar = hash1(cell * 7.31) * 0.15 - 0.075;
+  float colVar = hash1(cell * 7.31) * 0.12 - 0.06;
   baseCol *= 1.0 + colVar;
 
-  // Geometry setup — strand tangent (along fur axis = surface normal direction)
-  vec3 T = normalize(vTangent) * vSign;
-  vec3 N = normalize(vNormal) * vSign;
+  // Normal — use abs(dot) so both sides of the cloth are lit identically
+  vec3 N = normalize(vNormal);
   vec3 V = normalize(u_cameraPos - vWorldPos);
-  if (dot(N, V) < 0.0) { N = -N; T = -T; }
-
   vec3 L1 = normalize(u_lightDir1);
   vec3 L2 = normalize(u_lightDir2);
 
-  // === DIFFUSE: wrap lighting for soft fur look ===
-  float wrap = 0.5;
-  float diff1 = max(0.0, (dot(N, L1) + wrap) / (1.0 + wrap));
-  float diff2 = max(0.0, (dot(N, L2) + wrap) / (1.0 + wrap));
+  // === SOFT WRAP DIFFUSE — abs(dot) makes both sides symmetric ===
+  float wrap = 0.6;
+  float d1 = (abs(dot(N, L1)) + wrap) / (1.0 + wrap);
+  float d2 = (abs(dot(N, L2)) + wrap) / (1.0 + wrap);
 
-  // === KAJIYA-KAY SPECULAR: dual-lobe (primary tight + secondary wide) ===
-  vec3 H1 = normalize(L1 + V);
-  vec3 H2 = normalize(L2 + V);
+  // === AMBIENT OCCLUSION: gradual dark-to-light from root to tip ===
+  float ao = 0.3 + 0.7 * tNorm;
 
-  // Primary specular — sharp highlight, slightly shifted
-  float spec1a = kajiyaKay(T, H1, 80.0) * 0.6;
-  float spec1b = kajiyaKay(T, H2, 80.0) * 0.4;
-  // Secondary specular — broader, coloured by base
-  float spec2a = kajiyaKay(T, H1, 20.0) * 0.35;
-  float spec2b = kajiyaKay(T, H2, 20.0) * 0.25;
+  // === SOFT FORWARD SCATTER — warm glow when backlit, view-independent ===
+  // Use abs so it works from both sides
+  float scatter1 = pow(max(0.0, 1.0 - abs(dot(N, L1))), 2.0) * 0.15;
+  float scatter2 = pow(max(0.0, 1.0 - abs(dot(N, L2))), 2.0) * 0.1;
 
-  // === FORWARD SCATTERING (Marschner TT-like) ===
-  // Light passing through thin strands — visible when backlit
-  float scatter1 = pow(max(0.0, dot(V, -L1)), 4.0) * 0.3;
-  float scatter2 = pow(max(0.0, dot(V, -L2)), 4.0) * 0.2;
-  vec3 scatterCol = baseCol * 1.3; // transmitted light picks up strand colour
-
-  // === AMBIENT OCCLUSION: dark at roots, bright at tips ===
-  float ao = 0.25 + 0.75 * tNorm;
-
-  // === RIM / FRESNEL ===
-  float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-
-  // Combine
+  // Combine — soft, warm, non-reflective
   vec3 col = vec3(0.0);
-  // Diffuse
-  col += baseCol * (diff1 * u_lightCol1 + diff2 * u_lightCol2) * 0.7;
-  // Primary specular (white highlight)
-  col += (spec1a * u_lightCol1 + spec1b * u_lightCol2) * 0.4;
-  // Secondary specular (tinted by base colour for warmth)
-  col += baseCol * (spec2a * u_lightCol1 + spec2b * u_lightCol2) * 0.3;
-  // Forward scatter
-  col += scatterCol * (scatter1 * u_lightCol1 + scatter2 * u_lightCol2);
+  // Warm diffuse
+  col += baseCol * (d1 * u_lightCol1 * 0.6 + d2 * u_lightCol2 * 0.5);
+  // Hemisphere ambient — average of both lights
+  col += baseCol * (u_lightCol1 + u_lightCol2) * 0.1;
+  // Soft scatter (warm-tinted)
+  col += baseCol * vec3(1.1, 1.0, 0.9) * (scatter1 * u_lightCol1 + scatter2 * u_lightCol2);
   // AO
   col *= ao;
-  // Rim
-  col += rim * (u_lightCol1 * 0.2 + u_lightCol2 * 0.1) * 0.5;
-  // Ambient floor so roots aren't pure black
-  col += baseCol * 0.06;
+  // Warm ambient floor
+  col += baseCol * vec3(0.06, 0.055, 0.05);
 
   float alpha = edgeAlpha * (1.0 - tNorm * 0.5) * 0.88;
 
