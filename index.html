@@ -81,33 +81,19 @@
   #mic-btn { left: 10rem; }
   #dev-btn { left: 17rem; }
 
-  /* THEME TOGGLE */
-  #theme-btn {
+  /* THEME TOGGLE — pill-shaped animated switch */
+  #theme-toggle {
     position: fixed;
     top: 1.5rem;
     right: 2rem;
-    width: 36px; height: 36px;
-    background: var(--btn-bg);
-    border: 1px solid var(--btn-border);
-    border-radius: 50%;
+    width: 56px; height: 28px;
+    background: none;
+    border: none;
     cursor: pointer;
     z-index: 15;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     padding: 0;
-    transition: background 0.3s, border-color 0.3s;
   }
-  #theme-btn:hover { background: var(--fg10); }
-  #theme-btn svg { width: 18px; height: 18px; }
-
-  /* CLOTH WIPE OVERLAY */
-  #cloth-wipe {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    pointer-events: none;
-  }
+  #theme-toggle svg { width: 56px; height: 28px; display: block; }
 
   /* DEV PANEL */
   #dev-panel {
@@ -311,15 +297,31 @@
 <button class="ctrl-btn" id="music-btn">&#9654; music</button>
 <button class="ctrl-btn" id="mic-btn">mic off</button>
 <button class="ctrl-btn" id="dev-btn">dev</button>
-<button id="theme-btn" title="Toggle light/dark mode">
-  <svg id="theme-icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--fg50)">
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-  </svg>
-  <svg id="theme-icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--fg50);display:none">
-    <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+<button id="theme-toggle" title="Toggle light/dark mode">
+  <svg id="toggle-svg" viewBox="0 0 56 28" fill="none">
+    <defs>
+      <clipPath id="toggle-clip"><rect x="0" y="0" width="56" height="28" rx="14"/></clipPath>
+      <clipPath id="wipe-clip"><rect id="wipe-rect" x="0" y="0" width="0" height="28"/></clipPath>
+    </defs>
+    <!-- Track background (dark state) -->
+    <rect id="toggle-track" x="0" y="0" width="56" height="28" rx="14" fill="#1a1e2e" clip-path="url(#toggle-clip)"/>
+    <!-- Wipe overlay (incoming colour) -->
+    <rect id="wipe-fill" x="0" y="0" width="56" height="28" rx="14" fill="#e8e5e0" clip-path="url(#wipe-clip)" style="display:none"/>
+    <!-- Cloth-edge shadow line -->
+    <path id="wipe-edge" d="" fill="none" stroke="rgba(0,0,0,0.15)" stroke-width="0.5" clip-path="url(#toggle-clip)" style="display:none"/>
+    <!-- Knob -->
+    <circle id="toggle-knob" cx="14" cy="14" r="10" fill="#ffffff" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3))"/>
+    <!-- Moon icon (dark mode) -->
+    <g id="icon-moon" transform="translate(9,9) scale(0.42)">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="none" stroke="#6b7280" stroke-width="2"/>
+    </g>
+    <!-- Sun icon (light mode) -->
+    <g id="icon-sun" transform="translate(37,9) scale(0.42)" style="opacity:0">
+      <circle cx="12" cy="12" r="5" fill="none" stroke="#f59e0b" stroke-width="2"/>
+      <g stroke="#f59e0b" stroke-width="2"><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></g>
+    </g>
   </svg>
 </button>
-<svg id="cloth-wipe" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
 <div id="dev-panel"></div>
 
 <script type="importmap">
@@ -409,9 +411,11 @@ const P = {
   light2B: 0.5,
 
   // Fur
+  furEnabled: 1,
   furLength: 0.2,
   furDensity: 500,
   furShells: 50,
+  furThickness: 0.35,
   furCurl: 0,
   furGravity: 0.15,
   furTipFade: 0.6,
@@ -494,9 +498,11 @@ const PARAM_DEFS = {
     { key: 'light2B', min: 0, max: 2, step: 0.05, tip: 'Fill light blue channel.' },
   ],
   'Fur': [
+    { key: 'furEnabled',    min: 0,    max: 1,    step: 1,     tip: 'Toggle fur on (1) or off (0). Turn off to save GPU when not needed.' },
     { key: 'furLength',     min: 0,    max: 0.2,  step: 0.005, tip: 'How long the fur strands are. 0 = bald, higher = big fluffy puffball.' },
-    { key: 'furDensity',    min: 10,   max: 800,  step: 10,    tip: 'How many strands per unit area. Higher = thicker, denser fur. Lower = wispy. 500+ = cloth-like.' },
+    { key: 'furDensity',    min: 10,   max: 1000, step: 10,    tip: 'How many strands per unit area. Higher = thicker, denser fur. 500+ = cloth-like, 800+ = plush.' },
     { key: 'furShells',     min: 5,    max: 50,   step: 1,     tip: 'Number of transparent layers used to render the fur. More = smoother but heavier on GPU.' },
+    { key: 'furThickness',  min: 0.1,  max: 0.6,  step: 0.01,  tip: 'Base thickness of each strand. Higher = fatter, more visible strands. Lower = wispy thin hairs.' },
     { key: 'furCurl',       min: 0,    max: 1,    step: 0.05,  tip: 'How curly the fur is. 0 = straight strands, 1 = tight curls. Makes it feel more organic.' },
     { key: 'furGravity',    min: 0,    max: 0.5,  step: 0.01,  tip: 'How much gravity pulls the fur tips downward. Gives weight and drape to the strands.' },
     { key: 'furTipFade',    min: 0,    max: 1,    step: 0.05,  tip: 'How much the fur tips lighten/brighten compared to the roots. Creates depth and softness.' },
@@ -806,144 +812,136 @@ function updateBandMeters() {
 let isDark = true;
 let wipeAnimating = false;
 
-const themeBtn = document.getElementById('theme-btn');
-const clothWipeSvg = document.getElementById('cloth-wipe');
-const iconDark = document.getElementById('theme-icon-dark');
-const iconLight = document.getElementById('theme-icon-light');
+const toggleBtn = document.getElementById('theme-toggle');
+const toggleKnob = document.getElementById('toggle-knob');
+const iconMoon = document.getElementById('icon-moon');
+const iconSun = document.getElementById('icon-sun');
+const wipeFill = document.getElementById('wipe-fill');
+const wipeClipRect = document.getElementById('wipe-rect');
+const wipeEdge = document.getElementById('wipe-edge');
+const toggleTrack = document.getElementById('toggle-track');
 
-// Generate a wavy cloth-edge path with undulating folds
-function clothEdgePath(xPercent, amplitude, segments, seed) {
+// Generate a wavy cloth-edge path within the toggle (vertical edge, moves horizontally)
+function toggleClothEdge(xPos, amplitude, segments, seed) {
   const points = [];
   for (let i = 0; i <= segments; i++) {
     const t = i / segments;
-    const y = t * 100;
-    // Multi-frequency wave for natural cloth drape
-    const wave = Math.sin(t * Math.PI * 3 + seed) * amplitude
-               + Math.sin(t * Math.PI * 7 + seed * 2.3) * amplitude * 0.4
-               + Math.sin(t * Math.PI * 13 + seed * 0.7) * amplitude * 0.15;
-    points.push({ x: xPercent + wave, y });
+    const y = t * 28;
+    const wave = Math.sin(t * Math.PI * 4 + seed) * amplitude
+               + Math.sin(t * Math.PI * 9 + seed * 2.3) * amplitude * 0.35
+               + Math.sin(t * Math.PI * 15 + seed * 0.7) * amplitude * 0.12;
+    points.push({ x: xPos + wave, y });
   }
-  // Build SVG path
-  let d = `M ${points[0].x} ${points[0].y}`;
+  let d = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
   for (let i = 1; i < points.length; i++) {
     const prev = points[i - 1];
     const cur = points[i];
-    const cpY = (prev.y + cur.y) / 2;
-    d += ` C ${prev.x} ${cpY}, ${cur.x} ${cpY}, ${cur.x} ${cur.y}`;
+    const cpY = ((prev.y + cur.y) / 2).toFixed(2);
+    d += ` C ${prev.x.toFixed(2)} ${cpY}, ${cur.x.toFixed(2)} ${cpY}, ${cur.x.toFixed(2)} ${cur.y.toFixed(2)}`;
   }
   return d;
 }
 
-function runClothWipe(toLight) {
+function runToggleWipe(toLight) {
   if (wipeAnimating) return;
   wipeAnimating = true;
 
-  const targetColour = toLight ? '#f0ede8' : '#060608';
+  const duration = 500;
+  const totalFrames = Math.ceil(duration / (1000 / 60));
+  const segments = 16;
+  const amplitude = 3;
   const seed = Math.random() * 10;
-  const duration = 900;
-  const fps = 60;
-  const totalFrames = Math.ceil(duration / (1000 / fps));
-  const segments = 40;
-  const amplitude = 8;
 
-  // Create the wipe rectangle + wavy clip path
-  const ns = 'http://www.w3.org/2000/svg';
-  clothWipeSvg.innerHTML = '';
+  // Set the incoming colour
+  wipeFill.setAttribute('fill', toLight ? '#e8e5e0' : '#1a1e2e');
+  wipeFill.style.display = 'block';
+  wipeEdge.style.display = 'block';
+  wipeEdge.setAttribute('stroke', toLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.06)');
 
-  const defs = document.createElementNS(ns, 'defs');
-  const clipPath = document.createElementNS(ns, 'clipPath');
-  clipPath.id = 'wipe-clip';
-  const clipPathEl = document.createElementNS(ns, 'path');
-  clipPath.appendChild(clipPathEl);
-  defs.appendChild(clipPath);
-  clothWipeSvg.appendChild(defs);
-
-  const rect = document.createElementNS(ns, 'rect');
-  rect.setAttribute('width', '100');
-  rect.setAttribute('height', '100');
-  rect.setAttribute('fill', targetColour);
-  rect.setAttribute('clip-path', 'url(#wipe-clip)');
-  clothWipeSvg.appendChild(rect);
-
-  // Cloth-fold shadow line for depth
-  const shadowPath = document.createElementNS(ns, 'path');
-  shadowPath.setAttribute('fill', 'none');
-  shadowPath.setAttribute('stroke', toLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.04)');
-  shadowPath.setAttribute('stroke-width', '0.8');
-  clothWipeSvg.appendChild(shadowPath);
+  // Knob positions: dark = cx 14, light = cx 42
+  const knobFrom = toLight ? 14 : 42;
+  const knobTo = toLight ? 42 : 14;
 
   let frame = 0;
-  const direction = toLight ? 1 : -1; // L→R for light, R→L for dark
 
-  function animate() {
+  function animateToggle() {
     frame++;
-    const progress = frame / totalFrames;
+    const progress = Math.min(frame / totalFrames, 1);
     // Ease: cubic in-out
     const ease = progress < 0.5
       ? 4 * progress * progress * progress
       : 1 - Math.pow(-2 * progress + 2, 3) / 2;
 
+    // Move knob
+    const knobX = knobFrom + (knobTo - knobFrom) * ease;
+    toggleKnob.setAttribute('cx', knobX.toFixed(2));
+
+    // Cloth wipe edge position — sweeps L→R (toLight) or R→L (toDark)
     let edgeX;
-    if (direction === 1) {
-      // Left to right
-      edgeX = -15 + ease * 130; // overshoot past 100
+    if (toLight) {
+      edgeX = -4 + ease * 64; // left to right
     } else {
-      // Right to left
-      edgeX = 115 - ease * 130;
+      edgeX = 60 - ease * 64; // right to left
     }
 
-    // Animate the wave seed for rippling cloth motion
-    const animSeed = seed + progress * 4;
-    const edgePath = clothEdgePath(edgeX, amplitude * (1 - Math.abs(ease - 0.5) * 1.2), segments, animSeed);
+    const animSeed = seed + progress * 3;
+    const dampedAmp = amplitude * (1 - Math.abs(ease - 0.5) * 1.4);
+    const edgePath = toggleClothEdge(edgeX, Math.max(dampedAmp, 0.3), segments, animSeed);
 
-    // Build clip region: everything on the "filled" side of the wavy edge
+    // Build clip path for the wipe fill — everything on the filled side of the wavy edge
     let clipD;
-    if (direction === 1) {
-      clipD = `M -5 0 L -5 100 ${edgePath} L -5 0 Z`;
+    if (toLight) {
+      // Fill from left side
+      clipD = `M -2 0 L -2 28 ${edgePath} L -2 0 Z`;
     } else {
-      clipD = `M 105 0 L 105 100 ${edgePath} L 105 0 Z`;
+      // Fill from right side
+      clipD = `M 58 0 L 58 28 ${edgePath} L 58 0 Z`;
     }
-    clipPathEl.setAttribute('d', clipD);
-    shadowPath.setAttribute('d', edgePath);
+    // Update the wipe clip path — we need a <path> not a <rect>
+    let wipeClipPath = document.getElementById('wipe-clip-path');
+    if (!wipeClipPath) {
+      wipeClipPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      wipeClipPath.id = 'wipe-clip-path';
+      const clipEl = document.getElementById('wipe-clip');
+      clipEl.innerHTML = '';
+      clipEl.appendChild(wipeClipPath);
+    }
+    wipeClipPath.setAttribute('d', clipD);
+    wipeEdge.setAttribute('d', edgePath);
 
-    if (frame < totalFrames) {
-      requestAnimationFrame(animate);
+    // Fade icons
+    iconMoon.style.opacity = toLight ? (1 - ease).toFixed(2) : ease.toFixed(2);
+    iconSun.style.opacity = toLight ? ease.toFixed(2) : (1 - ease).toFixed(2);
+
+    if (progress < 1) {
+      requestAnimationFrame(animateToggle);
     } else {
-      // Apply the actual theme
+      // Apply theme
       if (toLight) {
         document.documentElement.classList.add('light');
       } else {
         document.documentElement.classList.remove('light');
       }
       isDark = !toLight;
-
-      // Update Three.js scene
       updateSceneTheme();
 
-      // Swap icons
-      iconDark.style.display = toLight ? 'none' : 'block';
-      iconLight.style.display = toLight ? 'block' : 'none';
-
-      // Fade out wipe overlay
-      clothWipeSvg.style.transition = 'opacity 0.3s';
-      clothWipeSvg.style.opacity = '0';
-      setTimeout(() => {
-        clothWipeSvg.innerHTML = '';
-        clothWipeSvg.style.transition = '';
-        clothWipeSvg.style.opacity = '1';
-        wipeAnimating = false;
-      }, 300);
+      // Set the track to the new colour and hide the wipe
+      toggleTrack.setAttribute('fill', toLight ? '#e8e5e0' : '#1a1e2e');
+      toggleKnob.setAttribute('fill', toLight ? '#1a1e2e' : '#ffffff');
+      wipeFill.style.display = 'none';
+      wipeEdge.style.display = 'none';
+      wipeAnimating = false;
     }
   }
-  requestAnimationFrame(animate);
+  requestAnimationFrame(animateToggle);
 }
 
 // Will be set after Three.js scene is created
 let updateSceneTheme = () => {};
 
-themeBtn.addEventListener('click', (e) => {
+toggleBtn.addEventListener('click', (e) => {
   e.stopPropagation();
-  runClothWipe(isDark); // if currently dark, wipe to light
+  runToggleWipe(isDark);
 });
 
 // ═══════════════════════════════════════════════
@@ -1785,7 +1783,7 @@ void main() {
 const furShellFS = `
 precision highp float;
 uniform sampler2D u_diffuseMap;
-uniform float u_furDensity, u_furTipFade, u_time;
+uniform float u_furDensity, u_furTipFade, u_furThickness, u_time;
 uniform vec3 u_lightDir1, u_lightCol1, u_lightDir2, u_lightCol2, u_cameraPos;
 varying vec3 vNormal, vWorldPos;
 varying vec2 vUv;
@@ -1814,8 +1812,8 @@ void main() {
 
   float tNorm = vAbsT / strandMaxH; // 0=root, 1=tip
 
-  // Strand radius tapers toward tip
-  float radius = 0.35 * (1.0 - tNorm * 0.85);
+  // Strand radius tapers toward tip — u_furThickness controls base width
+  float radius = u_furThickness * (1.0 - tNorm * 0.85);
   if (dist > radius) discard;
 
   float edgeAlpha = smoothstep(radius, radius * 0.1, dist);
@@ -1868,6 +1866,7 @@ function createFurShells() {
         u_halfShells: { value: half },
         u_furLength: { value: P.furLength },
         u_furDensity: { value: P.furDensity },
+        u_furThickness: { value: P.furThickness },
         u_furCurl: { value: P.furCurl },
         u_furGravity: { value: P.furGravity },
         u_furTipFade: { value: P.furTipFade },
@@ -1899,6 +1898,11 @@ createFurShells();
 let lastShellCount = Math.round(P.furShells);
 
 function updateFurUniforms() {
+  // Toggle fur visibility
+  const furOn = P.furEnabled >= 1;
+  for (const s of furShells) s.visible = furOn;
+  if (!furOn) return; // Skip all uniform updates when fur is off — saves GPU
+
   const targetCount = Math.round(P.furShells);
   if (targetCount !== lastShellCount) {
     lastShellCount = targetCount;
@@ -1912,6 +1916,7 @@ function updateFurUniforms() {
     u.u_halfShells.value = half;
     u.u_furLength.value = P.furLength;
     u.u_furDensity.value = P.furDensity;
+    u.u_furThickness.value = P.furThickness;
     u.u_furCurl.value = P.furCurl;
     u.u_furGravity.value = P.furGravity;
     u.u_furTipFade.value = P.furTipFade;
