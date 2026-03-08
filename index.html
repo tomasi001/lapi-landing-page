@@ -412,15 +412,15 @@ const P = {
 
   // Fur
   furEnabled: 1,
-  furLength: 0.2,
-  furDensity: 500,
-  furShells: 50,
-  furThickness: 0.35,
-  furCurl: 0,
-  furGravity: 0.15,
+  furLength: 0.025,
+  furDensity: 1000,
+  furShells: 39,
+  furThickness: 0.6,
+  furCurl: 0.15,
+  furGravity: 0.5,
   furTipFade: 0.6,
   furAudioReact: 2,
-  furWind: 1,
+  furWind: 0,
 };
 
 // ═══════════════════════════════════════════════
@@ -500,9 +500,9 @@ const PARAM_DEFS = {
   'Fur': [
     { key: 'furEnabled',    min: 0,    max: 1,    step: 1,     tip: 'Toggle fur on (1) or off (0). Turn off to save GPU when not needed.' },
     { key: 'furLength',     min: 0,    max: 0.2,  step: 0.005, tip: 'How long the fur strands are. 0 = bald, higher = big fluffy puffball.' },
-    { key: 'furDensity',    min: 10,   max: 1000, step: 10,    tip: 'How many strands per unit area. Higher = thicker, denser fur. 500+ = cloth-like, 800+ = plush.' },
+    { key: 'furDensity',    min: 10,   max: 2000, step: 10,    tip: 'How many strands per unit area. Higher = thicker, denser fur. 500+ = cloth-like, 1000+ = plush.' },
     { key: 'furShells',     min: 5,    max: 50,   step: 1,     tip: 'Number of transparent layers used to render the fur. More = smoother but heavier on GPU.' },
-    { key: 'furThickness',  min: 0.1,  max: 0.6,  step: 0.01,  tip: 'Base thickness of each strand. Higher = fatter, more visible strands. Lower = wispy thin hairs.' },
+    { key: 'furThickness',  min: 0.1,  max: 1.0,  step: 0.01,  tip: 'Base thickness of each strand. Higher = fatter, more visible strands. Lower = wispy thin hairs.' },
     { key: 'furCurl',       min: 0,    max: 1,    step: 0.05,  tip: 'How curly the fur is. 0 = straight strands, 1 = tight curls. Makes it feel more organic.' },
     { key: 'furGravity',    min: 0,    max: 0.5,  step: 0.01,  tip: 'How much gravity pulls the fur tips downward. Gives weight and drape to the strands.' },
     { key: 'furTipFade',    min: 0,    max: 1,    step: 0.05,  tip: 'How much the fur tips lighten/brighten compared to the roots. Creates depth and softness.' },
