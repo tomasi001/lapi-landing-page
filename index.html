@@ -342,9 +342,9 @@ const P = {
   substeps: 10,
   iterations: 3,
   gravity: -0.05,
-  damping: 1,
+  damping: 0.99,
   stretchCompliance: 0,
-  bendCompliance: 0.0016,
+  bendCompliance: 0,
   airDensity: 0,
   dragCoeff: 0.015,
   gravityDtMult: 0.02,
@@ -358,17 +358,17 @@ const P = {
   swayMult: 0,
 
   // Ripple
-  rippleSpeed: 5,
-  rippleFreq: 1,
-  rippleDecay: 2.4,
-  rippleSpatialDecay: 3.5,
-  rippleAmplitude: 0.22,
+  rippleSpeed: 2.2,
+  rippleFreq: 2.5,
+  rippleDecay: 3.9,
+  rippleSpatialDecay: 2,
+  rippleAmplitude: 0.35,
   rippleImpulse: 27.5,
 
   // Drag
-  grabRadius: 10,
+  grabRadius: 20,
   maxDragDisplacement: 0.06,
-  dragLerp: 0.3,
+  dragLerp: 1,
   maxThrowSpeed: 23,
   throwMultiplier: 26,
 
@@ -407,6 +407,16 @@ const P = {
   light2R: 0.3,
   light2G: 0.35,
   light2B: 0.5,
+
+  // Fur
+  furLength: 0.2,
+  furDensity: 500,
+  furShells: 50,
+  furCurl: 0,
+  furGravity: 0.15,
+  furTipFade: 0.6,
+  furAudioReact: 2,
+  furWind: 1,
 };
 
 // ═══════════════════════════════════════════════
@@ -482,6 +492,16 @@ const PARAM_DEFS = {
     { key: 'light2R', min: 0, max: 2, step: 0.05, tip: 'Fill light red channel. The fill light is usually cooler/bluer.' },
     { key: 'light2G', min: 0, max: 2, step: 0.05, tip: 'Fill light green channel.' },
     { key: 'light2B', min: 0, max: 2, step: 0.05, tip: 'Fill light blue channel.' },
+  ],
+  'Fur': [
+    { key: 'furLength',     min: 0,    max: 0.2,  step: 0.005, tip: 'How long the fur strands are. 0 = bald, higher = big fluffy puffball.' },
+    { key: 'furDensity',    min: 10,   max: 800,  step: 10,    tip: 'How many strands per unit area. Higher = thicker, denser fur. Lower = wispy. 500+ = cloth-like.' },
+    { key: 'furShells',     min: 5,    max: 50,   step: 1,     tip: 'Number of transparent layers used to render the fur. More = smoother but heavier on GPU.' },
+    { key: 'furCurl',       min: 0,    max: 1,    step: 0.05,  tip: 'How curly the fur is. 0 = straight strands, 1 = tight curls. Makes it feel more organic.' },
+    { key: 'furGravity',    min: 0,    max: 0.5,  step: 0.01,  tip: 'How much gravity pulls the fur tips downward. Gives weight and drape to the strands.' },
+    { key: 'furTipFade',    min: 0,    max: 1,    step: 0.05,  tip: 'How much the fur tips lighten/brighten compared to the roots. Creates depth and softness.' },
+    { key: 'furAudioReact', min: 0,    max: 2,    step: 0.05,  tip: 'How much the fur puffs and ripples in response to audio. The fur breathes with the music.' },
+    { key: 'furWind',       min: 0,    max: 1,    step: 0.05,  tip: 'How much wind displaces the fur tips. Higher = fur sways and flows in the breeze.' },
   ],
 };
 
@@ -1646,9 +1666,13 @@ float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 
 void main(){
   vec4 dTex=texture2D(u_diffuseMap,vUv); dTex.rgb+=vec3(0.08,0.03,-0.02)*u_audioWarmth;
-  vec3 nm=texture2D(u_normalMap,vUv).xyz*2.-1.; mat3 TBN=mat3(normalize(vTangent),normalize(vBitangent),normalize(vNormal));
+  vec3 nm=texture2D(u_normalMap,vUv).xyz*2.-1.;
+  // Flip normal, tangent, bitangent for back faces so both sides light identically
+  float facing=gl_FrontFacing?1.0:-1.0;
+  vec3 fNormal=normalize(vNormal)*facing, fTangent=normalize(vTangent)*facing, fBitangent=normalize(vBitangent)*facing;
+  mat3 TBN=mat3(fTangent,fBitangent,fNormal);
   vec3 N=normalize(TBN*nm),V=normalize(u_cameraPos-vWorldPos); float NdV=max(dot(N,V),0.);
-  vec3 wT=normalize(vTangent),fT=normalize(vBitangent),color=vec3(0);
+  vec3 wT=fTangent,fT=fBitangent,color=vec3(0);
   vec3 L[2]; L[0]=normalize(u_lightDir1); L[1]=normalize(u_lightDir2);
   vec3 LC[2]; LC[0]=u_lightCol1; LC[1]=u_lightCol2;
   for(int l=0;l<2;l++){
@@ -1662,7 +1686,6 @@ void main(){
   if(u_audioSparkle>0.05){vec2 sUV=floor(vUv*200.);float sv=hash(sUV+floor(u_time*3.));float th=1.-u_audioSparkle*0.3;
   if(sv>th){float in2=(sv-th)/(1.-th);float sa=hash(sUV*1.7);float vf=pow(abs(sin(sa*6.28+dot(V,N)*3.)),4.);
   color+=vec3(1,.95,.85)*in2*vf*u_audioSparkle*0.6;}}
-  if(!gl_FrontFacing)color*=0.6;
   gl_FragColor=vec4(color,1);
 }`;
 
@@ -1711,6 +1734,194 @@ const material=new THREE.ShaderMaterial({
   side:THREE.DoubleSide,
 });
 const mesh=new THREE.Mesh(geometry,material);scene.add(mesh);
+
+// ═══════════════════════════════════════════════
+// FUR SHELL SYSTEM
+// ═══════════════════════════════════════════════
+const furShellVS = `
+uniform float u_shellSigned, u_halfShells, u_furLength, u_furCurl, u_furGravity, u_furWind, u_furAudioReact;
+uniform float u_time, u_audioBass, u_audioSubBass;
+attribute vec3 tangent_attr;
+varying vec3 vNormal, vWorldPos;
+varying vec2 vUv;
+varying float vAbsT; // 0 at surface, 1 at tip (same for both sides)
+varying float vSign; // +1 or -1 side
+
+vec3 hash3(vec3 p) {
+  p = vec3(dot(p,vec3(127.1,311.7,74.7)), dot(p,vec3(269.5,183.3,246.1)), dot(p,vec3(113.5,271.9,124.6)));
+  return fract(sin(p)*43758.5453)*2.0-1.0;
+}
+
+void main() {
+  vUv = uv;
+  // u_shellSigned: -halfShells .. -1, 0, 1 .. halfShells
+  // Normalise to -1..+1 range, then split into sign and abs
+  float t = u_shellSigned / max(1.0, u_halfShells);
+  vSign = sign(t);
+  vAbsT = abs(t);
+  vNormal = normalize(normalMatrix * normal);
+
+  // Offset along normal (positive or negative side)
+  float height = t * u_furLength;
+
+  // Effects scale with distance from surface (absT)
+  float absT = vAbsT;
+  vec3 curlOff = hash3(position * 50.0 + u_time * 0.3) * u_furCurl * absT * absT * u_furLength * 0.5;
+  vec3 gravOff = vec3(0.0, -1.0, 0.0) * u_furGravity * absT * absT * u_furLength;
+
+  float wp = position.x * 5.0 + position.y * 3.0 + u_time * 2.0;
+  vec3 windOff = vec3(sin(wp)*0.5, 0.0, cos(wp*0.7)*0.3) * u_furWind * absT * u_furLength;
+
+  float puff = (u_audioBass * 0.6 + u_audioSubBass * 0.4) * u_furAudioReact * absT;
+  // Puff goes outward on each side
+  float puffHeight = vSign * puff * u_furLength * 0.5;
+
+  vec3 displaced = position + normal * (height + puffHeight) + curlOff + gravOff + windOff;
+  vec4 worldPos = modelMatrix * vec4(displaced, 1.0);
+  vWorldPos = worldPos.xyz;
+  gl_Position = projectionMatrix * viewMatrix * worldPos;
+}`;
+
+const furShellFS = `
+precision highp float;
+uniform sampler2D u_diffuseMap;
+uniform float u_furDensity, u_furTipFade, u_time;
+uniform vec3 u_lightDir1, u_lightCol1, u_lightDir2, u_lightCol2, u_cameraPos;
+varying vec3 vNormal, vWorldPos;
+varying vec2 vUv;
+varying float vAbsT; // 0=surface, 1=tip
+varying float vSign; // which side
+
+float hash1(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+void main() {
+  // Surface shell (absT ~ 0) — skip, fabric shader handles it
+  if (vAbsT < 0.02) discard;
+
+  // Strand grid
+  vec2 cellUV = vUv * u_furDensity;
+  vec2 cell = floor(cellUV);
+  vec2 f = fract(cellUV);
+
+  float h1 = hash1(cell);
+  float h2 = hash1(cell + 43.0);
+  vec2 center = vec2(h1, h2) * 0.6 + 0.2;
+  float dist = length(f - center);
+
+  // Per-strand random max height
+  float strandMaxH = 0.25 + hash1(cell * 3.17) * 0.75;
+  if (vAbsT > strandMaxH) discard;
+
+  float tNorm = vAbsT / strandMaxH; // 0=root, 1=tip
+
+  // Strand radius tapers toward tip
+  float radius = 0.35 * (1.0 - tNorm * 0.85);
+  if (dist > radius) discard;
+
+  float edgeAlpha = smoothstep(radius, radius * 0.1, dist);
+
+  vec3 col = texture2D(u_diffuseMap, vUv).rgb;
+  col *= 1.0 + tNorm * u_furTipFade * 0.8;
+
+  // Normal always faces camera on whichever side the shell is on
+  vec3 N = normalize(vNormal) * vSign;
+  vec3 V = normalize(u_cameraPos - vWorldPos);
+  // If normal points away from camera, flip it
+  if (dot(N, V) < 0.0) N = -N;
+
+  float d1 = dot(N, normalize(u_lightDir1)) * 0.5 + 0.5;
+  float d2 = dot(N, normalize(u_lightDir2)) * 0.5 + 0.5;
+  col *= (d1 * u_lightCol1 + d2 * u_lightCol2) * 0.75;
+
+  // AO — dark at roots, bright at tips
+  col *= 0.3 + 0.7 * tNorm;
+
+  // Rim glow
+  float rim = pow(1.0 - max(dot(N, V), 0.0), 2.5);
+  col += rim * (u_lightCol1 * 0.3 + u_lightCol2 * 0.15);
+
+  float alpha = edgeAlpha * (1.0 - tNorm * 0.55) * 0.85;
+
+  gl_FragColor = vec4(col, alpha);
+}`;
+
+// Create shell meshes
+const furShells = [];
+
+function createFurShells() {
+  for (const s of furShells) { scene.remove(s); s.material.dispose(); }
+  furShells.length = 0;
+
+  // Total shells split evenly: half negative side, centre, half positive side
+  const total = Math.round(P.furShells);
+  const half = Math.floor(total / 2);
+  // Signed indices: -half, ..., -1, 0, 1, ..., half
+  const shellCount = half * 2 + 1;
+
+  for (let i = 0; i < shellCount; i++) {
+    const signedIndex = i - half; // -half to +half
+    const shellMat = new THREE.ShaderMaterial({
+      vertexShader: furShellVS,
+      fragmentShader: furShellFS,
+      uniforms: {
+        u_shellSigned: { value: signedIndex },
+        u_halfShells: { value: half },
+        u_furLength: { value: P.furLength },
+        u_furDensity: { value: P.furDensity },
+        u_furCurl: { value: P.furCurl },
+        u_furGravity: { value: P.furGravity },
+        u_furTipFade: { value: P.furTipFade },
+        u_furWind: { value: P.furWind },
+        u_furAudioReact: { value: P.furAudioReact },
+        u_diffuseMap: { value: diffuseMap },
+        u_lightDir1: material.uniforms.u_lightDir1,
+        u_lightCol1: material.uniforms.u_lightCol1,
+        u_lightDir2: material.uniforms.u_lightDir2,
+        u_lightCol2: material.uniforms.u_lightCol2,
+        u_cameraPos: material.uniforms.u_cameraPos,
+        u_time: material.uniforms.u_time,
+        u_audioBass: { value: 0 },
+        u_audioSubBass: { value: 0 },
+      },
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const shellMesh = new THREE.Mesh(geometry, shellMat);
+    // Render order: outermost first (back-to-front from both sides toward centre)
+    shellMesh.renderOrder = Math.abs(signedIndex) + 1;
+    scene.add(shellMesh);
+    furShells.push(shellMesh);
+  }
+}
+createFurShells();
+
+let lastShellCount = Math.round(P.furShells);
+
+function updateFurUniforms() {
+  const targetCount = Math.round(P.furShells);
+  if (targetCount !== lastShellCount) {
+    lastShellCount = targetCount;
+    createFurShells();
+    return;
+  }
+
+  const half = Math.floor(targetCount / 2);
+  for (const s of furShells) {
+    const u = s.material.uniforms;
+    u.u_halfShells.value = half;
+    u.u_furLength.value = P.furLength;
+    u.u_furDensity.value = P.furDensity;
+    u.u_furCurl.value = P.furCurl;
+    u.u_furGravity.value = P.furGravity;
+    u.u_furTipFade.value = P.furTipFade;
+    u.u_furWind.value = P.furWind;
+    u.u_furAudioReact.value = P.furAudioReact;
+    u.u_audioBass.value = audioBands.bass;
+    u.u_audioSubBass.value = audioBands.subBass;
+    u.u_diffuseMap.value = diffuseMap;
+  }
+}
 
 // Ambient particles
 const aC=200;const aG=new THREE.BufferGeometry();const aP=new Float32Array(aC*3);
@@ -1783,6 +1994,7 @@ function animate(){
   ambientPts.geometry.attributes.position.needsUpdate=true;
 
   // Update band meters in dev panel
+  updateFurUniforms();
   updateBandMeters();
 
   renderer.render(scene,camera);
