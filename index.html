@@ -1227,14 +1227,15 @@ function updateAudio(dt) {
   if (!audioActive || !analyser) return;
   analyser.getByteFrequencyData(freqData);
 
-  const boost = 1.25;
+  // 1.56x total boost (1.25 * 1.25) — making reactivity unmistakeable
+  const boost = 1.56;
   const raw = {
-    subBass: Math.min(1, Math.pow(getBandEnergy(freqData, 20, 60), 1.5) * boost),
-    bass:    Math.min(1, Math.pow(getBandEnergy(freqData, 60, 250), 1.4) * boost),
-    lowMid:  Math.min(1, Math.pow(getBandEnergy(freqData, 250, 500), 1.3) * boost),
-    mid:     Math.min(1, Math.pow(getBandEnergy(freqData, 500, 2000), 1.3) * boost),
-    highMid: Math.min(1, Math.pow(getBandEnergy(freqData, 2000, 6000), 1.2) * boost),
-    high:    Math.min(1, Math.pow(getBandEnergy(freqData, 6000, 20000), 1.2) * boost),
+    subBass: Math.min(1, Math.pow(getBandEnergy(freqData, 20, 60), 1.3) * boost),
+    bass:    Math.min(1, Math.pow(getBandEnergy(freqData, 60, 250), 1.2) * boost),
+    lowMid:  Math.min(1, Math.pow(getBandEnergy(freqData, 250, 500), 1.15) * boost),
+    mid:     Math.min(1, Math.pow(getBandEnergy(freqData, 500, 2000), 1.15) * boost),
+    highMid: Math.min(1, Math.pow(getBandEnergy(freqData, 2000, 6000), 1.1) * boost),
+    high:    Math.min(1, Math.pow(getBandEnergy(freqData, 6000, 20000), 1.1) * boost),
   };
 
   for (const band in raw) {
@@ -1246,7 +1247,7 @@ function updateAudio(dt) {
     // Onset detection — positive spectral flux (only energy increases)
     const flux = Math.max(0, raw[band] - prevRaw[band]);
     // Onset envelope — snaps to transient, decays fast
-    audioOnsets[band] = onsetEnvelopes[band].process(flux * 3.0, dt);
+    audioOnsets[band] = onsetEnvelopes[band].process(flux * 4.5, dt);
     prevRaw[band] = raw[band];
   }
 }
@@ -1670,34 +1671,41 @@ function applyExternalForces(dt) {
   time += dt;
   const t = time;
 
-  // === WIND — continuous amplitude (bass) + onset gusts (kick transients) ===
+  // === WIND — bass amplitude + onset gusts (25% stronger) ===
   const windBase = P.windMultBase + audioBands.bass * P.windMultBass + audioBands.subBass * P.windMultSubBass;
-  // Bass onset → sudden wind gust (punchy, decays fast)
-  const gustForce = audioOnsets.bass * 12;
+  const gustForce = audioOnsets.bass * 18; // was 12 → 18 (50% boost for obvious kick response)
   const windMult = windBase + gustForce;
 
-  // === SUB-BASS — deep breathing displacement ===
-  const displace = audioBands.subBass * P.displaceSubBass;
+  // === SUB-BASS — deep breathing displacement (25% stronger) ===
+  const displace = audioBands.subBass * P.displaceSubBass * 1.25;
 
-  // === BASS ONSET — gravity pulse (brief anti-gravity on kick hits) ===
-  const gravityPulse = audioOnsets.bass * 0.8; // pushes against gravity on transients
+  // === BASS ONSET — gravity pulse (kicks lift the cloth) ===
+  const gravityPulse = audioOnsets.bass * 1.2; // was 0.8 → 1.2
 
-  // === HIGH-MID ONSET — micro-jitter on hi-hat/snare ===
-  const jitter = audioOnsets.highMid * 0.012;
+  // === LOW-MID — wave propagation (body/warmth creates rolling waves) ===
+  const waveForce = audioBands.lowMid * 0.025 + audioOnsets.lowMid * 0.04;
 
-  // === HIGH ONSET — sparkle displacement (tiny random vertex push) ===
-  const sparkleDisp = audioOnsets.high * 0.006;
+  // === MID — sway + vertical surge (melody lifts and sways) ===
+  const swayForce = (audioBands.mid * 0.7 + audioOnsets.mid * 0.5) * P.swayMult;
+  const midLift = audioOnsets.mid * 0.015; // melodic hits push cloth upward
 
-  // === MID — sway lateral movement (melody drives dancing) ===
-  const swayForce = (audioBands.mid * 0.6 + audioOnsets.mid * 0.4) * P.swayMult;
+  // === HIGH-MID ONSET — surface jitter (snare/hi-hat vibration, 25% stronger) ===
+  const jitter = audioOnsets.highMid * 0.02; // was 0.012 → 0.02
+
+  // === HIGH ONSET — sparkle displacement + edge ripple ===
+  const sparkleDisp = audioOnsets.high * 0.01; // was 0.006 → 0.01
+  const edgeRipple = audioBands.high * 0.008; // continuous high → edge flutter
 
   for (let i = 0; i < numParticles; i++) {
     if (invMass[i]===0) continue;
 
-    // Gravity with bass onset pulse (kicks briefly lift the cloth)
+    // Gravity with bass onset pulse
     vel[i*3+1] += (P.gravity + gravityPulse) * dt * P.gravityDtMult;
 
     const px=pos[i*3], py=pos[i*3+1], pz=pos[i*3+2];
+    // UV coords for spatial effects
+    const ui = i % COLS, vi = Math.floor(i / COLS);
+    const u = ui / (COLS-1), v = vi / (ROWS-1);
 
     // Wind field — spatially varying
     const windX = (Math.sin(t*0.3+py*2)*0.15 + Math.sin(t*0.7+pz*1.5)*0.08) * 0.5 * windMult;
@@ -1709,10 +1717,20 @@ function applyExternalForces(dt) {
     // Sub-bass breathing
     vel[i*3+2] += displace * Math.sin(t*2+px*3+py*3) * dt * P.breathingMult;
 
-    // Mid sway (melody/body drives lateral movement)
-    vel[i*3] += swayForce * Math.sin(t*1.5+py*2.5) * dt;
+    // Low-mid wave propagation — rolling waves across the cloth surface
+    if (waveForce > 0.001) {
+      const wave = Math.sin(u*6.28*2 + t*3.5) * Math.cos(v*6.28*1.5 + t*2.8);
+      vel[i*3+2] += wave * waveForce;
+      // Perpendicular ripple for 3D wave appearance
+      vel[i*3] += Math.cos(u*6.28*3 + t*4.2) * waveForce * 0.5;
+    }
 
-    // High-mid jitter — snare/hi-hat creates micro-vibration across the cloth
+    // Mid sway (melody drives lateral dancing)
+    vel[i*3] += swayForce * Math.sin(t*1.5+py*2.5) * dt;
+    // Mid onset lift — melodic hits push upward
+    vel[i*3+1] += midLift;
+
+    // High-mid jitter — snare/hi-hat vibration
     if (jitter > 0.001) {
       const jx = (Math.sin(px*47.1+t*11)*2-1) * jitter;
       const jy = (Math.sin(py*31.7+t*13)*2-1) * jitter;
@@ -1720,12 +1738,22 @@ function applyExternalForces(dt) {
       vel[i*3] += jx; vel[i*3+1] += jy; vel[i*3+2] += jz;
     }
 
-    // High sparkle — tiny random vertex push on cymbal transients
+    // High sparkle — random vertex push on cymbal transients
     if (sparkleDisp > 0.0005) {
       const h = Math.sin(px*97.1+py*71.3+t*23);
-      if (h > 0.7) { // only affects ~15% of particles for sparkle effect
-        vel[i*3]   += (h-0.7)*sparkleDisp*8;
-        vel[i*3+1] += (Math.sin(px*83+t*19)-0.5)*sparkleDisp*5;
+      if (h > 0.6) { // affects ~20% of particles (was 15%)
+        vel[i*3]   += (h-0.6)*sparkleDisp*10;
+        vel[i*3+1] += (Math.sin(px*83+t*19)-0.5)*sparkleDisp*7;
+      }
+    }
+
+    // High continuous — edge flutter (particles near cloth edges flutter with cymbals)
+    if (edgeRipple > 0.001) {
+      const edgeDist = Math.min(u, 1-u, v, 1-v); // 0 at edges, 0.5 at center
+      if (edgeDist < 0.15) {
+        const edgeFactor = (0.15 - edgeDist) / 0.15; // 1 at edge, 0 at 0.15 in
+        vel[i*3]   += Math.sin(t*19+px*30)*edgeRipple*edgeFactor*3;
+        vel[i*3+2] += Math.cos(t*23+py*25)*edgeRipple*edgeFactor*3;
       }
     }
   }
@@ -2195,8 +2223,9 @@ function updateFurUniforms() {
     u.u_furTipFade.value = P.furTipFade;
     u.u_furWind.value = P.furWind;
     u.u_furAudioReact.value = P.furAudioReact;
-    u.u_audioBass.value = audioBands.bass;
-    u.u_audioSubBass.value = audioBands.subBass;
+    // Feed both amplitude + onset for punchier fur puff response
+    u.u_audioBass.value = audioBands.bass + audioOnsets.bass * 1.5;
+    u.u_audioSubBass.value = audioBands.subBass + audioOnsets.subBass * 0.8;
     u.u_diffuseMap.value = diffuseMap;
   }
 }
@@ -2249,55 +2278,80 @@ function animate(){
 
   // === CAMERA — bass pushes radius, sub-bass breathes FOV, onset shakes ===
   const aCP = audioBands.bass * P.camAudioPush;
-  const subBreath = audioBands.subBass * 0.8; // sub-bass FOV breathing
-  const camShake = audioOnsets.bass * 0.04; // kick transient micro-shake
+  const subBreath = audioBands.subBass * 1.2; // was 0.8 → 1.2 (FOV breathing)
+  const camShake = audioOnsets.bass * 0.06; // was 0.04 → 0.06 (kick camera punch)
+  // Low-mid → gentle orbit speed modulation (more energy = slightly faster orbit)
+  const orbitBoost = audioBands.lowMid * 0.03;
   camera.position.set(
-    Math.sin(t*P.camSpeed)*(P.camRadius+aCP) + camShake*Math.sin(t*37),
-    Math.sin(t*P.camSpeed*0.7)*P.camVertAmp+P.camVertOffset + camShake*Math.cos(t*41),
-    Math.cos(t*P.camSpeed)*(P.camRadius+aCP)
+    Math.sin(t*(P.camSpeed+orbitBoost))*(P.camRadius+aCP) + camShake*Math.sin(t*37),
+    Math.sin(t*(P.camSpeed+orbitBoost)*0.7)*P.camVertAmp+P.camVertOffset + camShake*Math.cos(t*41),
+    Math.cos(t*(P.camSpeed+orbitBoost))*(P.camRadius+aCP)
   );
-  camera.fov = 45 + subBreath * 3; // subtle FOV breathing with sub-bass
+  camera.fov = 45 + subBreath * 4; // was *3 → *4 (stronger FOV breathing)
   camera.updateProjectionMatrix();
   camera.lookAt(0,0,0);
 
   material.uniforms.u_cameraPos.value.copy(camera.position);
   material.uniforms.u_time.value=t;
-  // Sheen from high onsets (cymbal hits create brief shimmer)
-  material.uniforms.u_audioSheen.value = audioBands.high * 0.3 + audioOnsets.high * 2.0;
-  // Warmth from mid amplitude (melody drives warm colour shift)
-  material.uniforms.u_audioWarmth.value = audioBands.mid;
-  // Sparkle from high-mid onsets (hi-hat transients trigger sparkle)
-  material.uniforms.u_audioSparkle.value = audioBands.highMid * 0.5 + audioOnsets.highMid * 2.5;
+  // Sheen from high onsets (cymbal shimmer) — boosted 25%
+  material.uniforms.u_audioSheen.value = audioBands.high * 0.5 + audioOnsets.high * 3.0;
+  // Warmth from mid amplitude (melody drives warm colour shift) — boosted
+  material.uniforms.u_audioWarmth.value = audioBands.mid * 1.5 + audioOnsets.mid * 0.5;
+  // Sparkle from high-mid onsets (hi-hat sparkle) — boosted 25%
+  material.uniforms.u_audioSparkle.value = audioBands.highMid * 0.8 + audioOnsets.highMid * 3.5;
 
-  // === LIGHTING — audio-reactive colour shifts ===
-  // Bass onset briefly brightens the main light (flash on kick)
-  const kickFlash = audioOnsets.bass * 0.3;
-  // Mid amplitude warms the light colour
-  const warmShift = audioBands.mid * 0.08;
-  // High-mid adds cool rim tint
-  const coolRim = audioOnsets.highMid * 0.15;
+  // === LIGHTING — audio-reactive colour shifts (all boosted 25%) ===
+  const kickFlash = audioOnsets.bass * 0.5; // was 0.3 → 0.5
+  const warmShift = audioBands.mid * 0.12; // was 0.08 → 0.12
+  const coolRim = audioOnsets.highMid * 0.25; // was 0.15 → 0.25
+  // Low-mid → saturation boost (more body = more vivid)
+  const satBoost = audioBands.lowMid * 0.1;
+  // Sub-bass → slow hue rotation on fill light
+  const hueShift = audioBands.subBass * 0.06;
 
-  material.uniforms.u_lightDir1.value.set(P.light1X+Math.sin(t*0.2)*0.3, P.light1Y, P.light1Z+Math.cos(t*0.15)*0.3).normalize();
+  // Main light — light direction pulses toward camera on bass onset
+  const dirPulse = audioOnsets.bass * 0.15;
+  material.uniforms.u_lightDir1.value.set(
+    P.light1X+Math.sin(t*0.2)*0.3+dirPulse,
+    P.light1Y,
+    P.light1Z+Math.cos(t*0.15)*0.3
+  ).normalize();
   material.uniforms.u_lightDir2.value.set(P.light2X, P.light2Y, P.light2Z).normalize();
+
   material.uniforms.u_lightCol1.value.set(
-    P.light1R + kickFlash + warmShift,
-    P.light1G + kickFlash * 0.7 + warmShift * 0.5,
+    P.light1R + kickFlash + warmShift + satBoost,
+    P.light1G + kickFlash * 0.7 + warmShift * 0.5 + satBoost * 0.5,
     P.light1B + kickFlash * 0.3 - warmShift * 0.3
   );
   material.uniforms.u_lightCol2.value.set(
-    P.light2R + coolRim * 0.3,
-    P.light2G + coolRim * 0.5,
-    P.light2B + coolRim
+    P.light2R + coolRim * 0.3 + hueShift * 0.5,
+    P.light2G + coolRim * 0.5 - hueShift * 0.3,
+    P.light2B + coolRim + hueShift
   );
 
+  // === AMBIENT PARTICLES — audio-reactive speed + size ===
   const pp=ambientPts.geometry.attributes.position.array;
-  for(let i=0;i<aC;i++){pp[i*3+1]+=0.001;if(pp[i*3+1]>5)pp[i*3+1]=-5;}
+  const pSpeed = 0.001 + audioBands.high * 0.004 + audioOnsets.highMid * 0.008;
+  for(let i=0;i<aC;i++){
+    pp[i*3+1]+=pSpeed;
+    if(pp[i*3+1]>5)pp[i*3+1]=-5;
+    // Bass onset → lateral scatter
+    if(audioOnsets.bass > 0.1) {
+      pp[i*3] += (Math.sin(i*7.1)*2-1)*audioOnsets.bass*0.01;
+    }
+  }
   ambientPts.geometry.attributes.position.needsUpdate=true;
+  // Particle size pulses with bass
+  ambientMat.size = 0.008 + audioBands.bass * 0.006 + audioOnsets.bass * 0.015;
+  ambientMat.opacity = 0.15 + audioBands.high * 0.15 + audioOnsets.high * 0.3;
 
   // Update band meters in dev panel
   updateFurUniforms();
   detectBeat(dt);
   updateBandMeters();
+
+  // Scene exposure pulses with overall energy — bass onset brightens, sub-bass breathes
+  renderer.toneMappingExposure = 1.1 + audioOnsets.bass * 0.25 + audioBands.subBass * 0.1;
 
   renderer.render(scene,camera);
 }
