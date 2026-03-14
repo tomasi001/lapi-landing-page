@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>lappie.ai — AI-powered workflows for South Africa</title>
 
 <!-- Fonts -->
@@ -15,10 +15,6 @@
   @font-face { font-family: 'Satoshi'; src: url('../../Satoshi_Complete/Fonts/WEB/fonts/Satoshi-Light.woff2') format('woff2'); font-weight: 300; font-style: normal; font-display: swap; }
   @font-face { font-family: 'Satoshi'; src: url('../../Satoshi_Complete/Fonts/WEB/fonts/Satoshi-Bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
 </style>
-<script>
-  document.fonts.ready.then(() => document.body.classList.add('fonts-ready'));
-  setTimeout(() => document.body.classList.add('fonts-ready'), 3000); // fallback
-</script>
 
 <style>
   :root {
@@ -58,6 +54,21 @@
     --text-glow-far: rgba(20,18,16,0.6);
     --grain-blend: screen;
   }
+  [data-theme="savanna"] {
+    --bg: #f5e6c8;
+    --bg-rgb: 245,230,200;
+    --text: #3d2b1f;
+    --text-muted: rgba(61,43,31,0.55);
+    --text-subtle: rgba(61,43,31,0.3);
+    --glass: rgba(255,240,220,0.45);
+    --glass-border: rgba(255,240,220,0.55);
+    --glass-hover: rgba(255,240,220,0.65);
+    --shadow-md: 0 8px 32px rgba(61,43,31,0.08), 0 2px 6px rgba(61,43,31,0.04);
+    --shadow-lg: 0 24px 64px rgba(61,43,31,0.12), 0 8px 20px rgba(61,43,31,0.06);
+    --text-glow: rgba(245,230,200,0.9);
+    --text-glow-far: rgba(245,230,200,0.6);
+    --grain-blend: multiply;
+  }
   [data-theme="ocean"] {
     --bg: #0c1e2e;
     --bg-rgb: 12,30,46;
@@ -73,6 +84,22 @@
     --text-glow: rgba(12,30,46,0.9);
     --text-glow-far: rgba(12,30,46,0.6);
     --grain-blend: screen;
+  }
+  [data-theme="blush"] {
+    --bg: #e8e4e0;
+    --bg-rgb: 232,228,224;
+    --text: #2a2a2e;
+    --text-muted: rgba(42,42,46,0.55);
+    --text-subtle: rgba(42,42,46,0.3);
+    --glass: rgba(200,200,210,0.35);
+    --glass-border: rgba(200,200,210,0.5);
+    --glass-hover: rgba(200,200,210,0.6);
+    --shadow-md: 0 8px 32px rgba(42,42,46,0.08), 0 2px 6px rgba(42,42,46,0.04);
+    --shadow-lg: 0 24px 64px rgba(42,42,46,0.12), 0 8px 20px rgba(42,42,46,0.06);
+    --shadow-karoo: 0 8px 32px rgba(80,90,110,0.2), 0 2px 8px rgba(80,90,110,0.12);
+    --text-glow: rgba(232,228,224,0.9);
+    --text-glow-far: rgba(232,228,224,0.6);
+    --grain-blend: multiply;
   }
   [data-theme="moss"] {
     --bg: #0e1a0f;
@@ -91,9 +118,8 @@
     --grain-blend: screen;
   }
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-  html { font-size: 16px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; overflow-x: hidden; }
-  body { background: var(--bg); cursor: crosshair; font-family: 'Satoshi', sans-serif; color: var(--text); overflow-x: hidden; transition: background 0.6s ease, color 0.6s ease; opacity: 0; }
-  body.fonts-ready { opacity: 1; transition: opacity 0.3s ease, background 0.6s ease, color 0.6s ease; }
+  html { font-size: 16px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+  body { background: var(--bg); cursor: crosshair; font-family: 'Satoshi', sans-serif; color: var(--text); overflow-x: hidden; transition: background 0.6s ease, color 0.6s ease; }
   ::selection { background: rgba(148,31,26,0.15); color: var(--text); }
 
   /* Film grain overlay */
@@ -377,66 +403,54 @@
 
   /* ── Mobile control button (top-right, hidden on desktop) ── */
   .mobile-ctrl { display: none; }
-  /* Pill header — mirrors desktop .nav-ctrl-header */
   .mobile-ctrl-btn {
-    height: 42px;
-    border-radius: 999px; border: 1px solid var(--glass-border);
-    background: rgba(255,255,255,0.25);
+    width: 42px; height: 42px;
+    border-radius: 50%; border: 1px solid var(--glass-border);
+    background: rgba(255,255,255,0.55);
     backdrop-filter: blur(40px) saturate(200%);
     -webkit-backdrop-filter: blur(40px) saturate(200%);
     cursor: pointer; color: var(--karoo);
     display: flex; align-items: center; justify-content: center;
-    padding: 0 12px;
     box-shadow:
       0 1px 2px rgba(0,0,0,0.04),
       0 4px 16px rgba(0,0,0,0.06),
       inset 0 1px 0 rgba(255,255,255,0.35);
-    position: relative; z-index: 2;
-    transition: padding 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.5s, border-color 0.5s, box-shadow 0.3s;
+    transition: transform 0.2s, opacity 0.4s, box-shadow 0.3s;
   }
   [data-theme="dark"] .mobile-ctrl-btn,
   [data-theme="ocean"] .mobile-ctrl-btn,
   [data-theme="moss"] .mobile-ctrl-btn {
     background: rgba(255,255,255,0.06);
     border-color: rgba(255,255,255,0.1);
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1), 0 4px 16px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.06);
   }
-  .mobile-ctrl-btn:active { transform: scale(0.95); }
+  .mobile-ctrl-btn:active { transform: scale(0.9); }
   .mobile-ctrl-btn svg { width: 18px; height: 18px; }
   .mobile-ctrl.nav-hidden { opacity: 0; pointer-events: none; }
-  /* Expanded pill state — pill widens so dropdown is 75% of pill */
-  .mobile-ctrl-btn {
-    transition: padding 0.4s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.5s, border-color 0.5s, box-shadow 0.3s;
-  }
-  /* Dropdown — mirrors desktop .nav-ctrl-menu */
   .mobile-ctrl-popup {
-    position: absolute; top: 100%; left: 50%;
-    transform: translateX(-50%) scaleY(0.9);
+    position: absolute; top: 100%; right: 0;
+    margin-top: 8px;
     display: flex; flex-direction: column; align-items: center; gap: 6px;
     padding: 10px 8px;
-    background: rgba(255,255,255,0.22);
+    background: rgba(255,255,255,0.65);
     backdrop-filter: blur(40px) saturate(200%);
     -webkit-backdrop-filter: blur(40px) saturate(200%);
-    border: 1px solid rgba(255,255,255,0.35);
-    border-radius: 0 0 999px 999px;
-    z-index: 1;
-    overflow: hidden;
-    max-height: 0; opacity: 0;
-    pointer-events: none;
+    border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 999px;
+    opacity: 0; pointer-events: none;
+    transform: scaleY(0.9);
     transform-origin: top center;
-    transition: max-height 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.15);
+    transition: opacity 0.25s, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.3);
   }
   [data-theme="dark"] .mobile-ctrl-popup,
   [data-theme="ocean"] .mobile-ctrl-popup,
   [data-theme="moss"] .mobile-ctrl-popup {
-    background: rgba(255,255,255,0.05);
-    border-color: rgba(255,255,255,0.08);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.04);
+    background: rgba(20,18,16,0.7);
+    border-color: rgba(255,255,255,0.12);
   }
   .mobile-ctrl-popup.open {
-    max-height: 600px; opacity: 1; pointer-events: auto;
-    transform: translateX(-50%) scaleY(1);
+    opacity: 1; pointer-events: auto;
+    transform: scaleY(1);
   }
   .mobile-ctrl-swatch {
     width: 28px; height: 28px; border-radius: 50%;
@@ -783,6 +797,7 @@
   #scroll-content {
     position: relative; z-index: 2;
     pointer-events: none;
+    padding-top: 100vh; /* Push content below the pinned canvas initially */
   }
   #scroll-content a, #scroll-content button, .footer-brand, .midcta-content { pointer-events: auto; }
 
@@ -836,16 +851,19 @@
   }
   .hero-content h1 {
     font-family: 'Roundo', sans-serif; font-weight: 300;
-    font-size: clamp(3.4rem, 6.5vw, 5.5rem);
+    font-size: clamp(2.6rem, 5vw, 4.2rem);
     line-height: 1.08; letter-spacing: -0.04em;
     text-transform: lowercase; color: var(--text);
-    margin-bottom: 1.5rem; white-space: nowrap;
+    margin-bottom: 1.5rem;
+  }
+  .hero-content h1 strong {
+    font-weight: 500;
   }
   .hero-content p {
     font-family: 'Satoshi', sans-serif; font-weight: 400;
     font-size: clamp(1.1rem, 1.4vw, 1.35rem);
     line-height: 1.75; color: var(--text-muted);
-    max-width: 40rem; margin: 0 auto 2.5rem;
+    max-width: 50rem; margin: 0 auto 2.5rem;
     letter-spacing: 0.01em;
   }
   .hero-buttons {
@@ -1269,15 +1287,13 @@
       top: 1rem; right: 1.2rem;
       z-index: 51;
       pointer-events: auto;
-      opacity: 0;
-      transform: scale(0.8) translateY(-10px);
-      animation: navFadeIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s forwards;
       transition: opacity 0.4s ease;
     }
     .section { padding: 0 1.25rem; }
     .hero-label { font-size: 0.55rem; letter-spacing: 0.18em; }
-    .hero-label .label-separator { display: none; }
-    .hero-content h1 { font-size: clamp(2.8rem, 12vw, 3.8rem); line-height: 1.1; margin-bottom: 0.8rem; white-space: normal; }
+    .hero-label .label-separator,
+    .hero-label .label-line:last-child { display: none; }
+    .hero-content h1 { font-size: clamp(2.75rem, 11.25vw, 3.75rem); line-height: 1.1; margin-bottom: 0.8rem; }
     .hero-content p { font-size: 0.85rem; line-height: 1.5; max-width: 85%; margin: 0 auto 1.5rem; }
     .hero-buttons { flex-direction: row; gap: 0.75rem; justify-content: center; align-items: center; }
     .hero-buttons .btn-text-full { display: none; }
@@ -1299,103 +1315,9 @@
     .spinwave-container { font-size: clamp(1.5rem, 4.8vw, 2.5rem); }
     .offering-cards { grid-template-columns: 1fr; }
     .section--offering { min-height: auto; padding: 6vh 1.25rem 8vh; }
-    .cloth-hint { bottom: 14vh; font-size: 0.6rem; }
+    .cloth-hint { bottom: 8vh; font-size: 0.6rem; }
     .section--footer { min-height: 80vh; }
     .footer-close h2 { font-size: clamp(1.8rem, 7vw, 2.6rem); }
-    .cs-cloth-hint { font-size: 0.7rem; white-space: nowrap; bottom: calc(1.5rem + 18px + 0.3rem + 0.55rem + 200px); }
-  }
-
-  /* ── Coming-soon footer ── */
-  .cs-footer {
-    position: absolute; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
-    text-align: center; pointer-events: auto; z-index: 5;
-  }
-  .cs-cloth-hint {
-    position: absolute; left: 50%; transform: translateX(-50%);
-    text-align: center; z-index: 5; pointer-events: none;
-    font-family: 'Satoshi', sans-serif; font-size: 0.75rem; font-weight: 400;
-    letter-spacing: 0.04em; color: var(--text-subtle);
-    bottom: calc(1.5rem + 18px + 0.3rem + 0.55rem + 50px);
-  }
-  .cs-footer img { height: 18px; margin-bottom: 0.3rem; }
-  .cs-footer p {
-    font-family: 'Satoshi', sans-serif; font-size: 0.55rem; font-weight: 500;
-    letter-spacing: 0.25em; text-transform: uppercase; color: var(--text-subtle);
-    margin: 0;
-  }
-
-  /* ── Waitlist modal ── */
-  .waitlist-overlay {
-    display: none; position: fixed; inset: 0; z-index: 200;
-    background: rgba(0,0,0,0.3); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-    align-items: center; justify-content: center;
-  }
-  .waitlist-overlay.open { display: flex; }
-  .waitlist-modal {
-    background: rgba(255,255,255,0.25);
-    backdrop-filter: blur(40px) saturate(200%);
-    -webkit-backdrop-filter: blur(40px) saturate(200%);
-    border: 1px solid rgba(255,255,255,0.4);
-    border-radius: 999px; padding: 1.8rem 2.5rem; max-width: 400px; width: 88%;
-    text-align: center; position: relative;
-    box-shadow:
-      0 1px 2px rgba(0,0,0,0.04),
-      0 4px 16px rgba(0,0,0,0.06),
-      inset 0 1px 0 rgba(255,255,255,0.35);
-  }
-  [data-theme="dark"] .waitlist-modal,
-  [data-theme="ocean"] .waitlist-modal,
-  [data-theme="moss"] .waitlist-modal {
-    background: rgba(255,255,255,0.06);
-    border-color: rgba(255,255,255,0.1);
-    box-shadow:
-      0 1px 2px rgba(0,0,0,0.1),
-      0 4px 16px rgba(0,0,0,0.15),
-      inset 0 1px 0 rgba(255,255,255,0.06);
-  }
-  .waitlist-modal h2 {
-    font-family: 'Roundo', sans-serif; font-weight: 500; text-transform: lowercase;
-    font-size: clamp(1.1rem, 3vw, 1.4rem); color: var(--karoo);
-    margin: 0 0 0.3rem; letter-spacing: -0.02em;
-  }
-  .waitlist-modal .waitlist-desc {
-    font-family: 'Satoshi', sans-serif; font-size: 0.7rem; color: var(--text-muted);
-    margin: 0 0 1rem; font-weight: 400;
-  }
-  .waitlist-form {
-    position: relative; width: 100%;
-  }
-  .waitlist-form input {
-    width: 100%; padding: 0.65rem 2.8rem 0.65rem 1rem; border-radius: 999px;
-    border: 1px solid var(--glass-border);
-    background: rgba(255,255,255,0.4);
-    font-family: 'Satoshi', sans-serif; font-size: 0.75rem; color: var(--text);
-    outline: none; transition: border-color 0.3s, background 0.3s;
-  }
-  [data-theme="dark"] .waitlist-form input,
-  [data-theme="ocean"] .waitlist-form input,
-  [data-theme="moss"] .waitlist-form input { background: rgba(255,255,255,0.08); }
-  .waitlist-form input:focus { border-color: var(--karoo); }
-  .waitlist-form input::placeholder { color: var(--text-subtle); }
-  .waitlist-form button {
-    position: absolute; right: 4px; top: 50%; transform: translateY(-50%) scale(0);
-    width: 28px; height: 28px; border-radius: 50%; border: none;
-    background: var(--karoo); color: #fff;
-    font-size: 0.75rem; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s;
-    opacity: 0;
-  }
-  .waitlist-form button.show {
-    transform: translateY(-50%) scale(1); opacity: 1;
-  }
-  .waitlist-form button:hover { background: #7a1815; }
-  .waitlist-thanks {
-    font-family: 'Satoshi', sans-serif; font-size: 0.75rem; color: var(--karoo);
-    font-weight: 400; margin: 0;
-  }
-  @media (max-width: 768px) {
-    .waitlist-modal { padding: 2rem 1.6rem; max-width: 300px; border-radius: 2rem; }
   }
 </style>
 <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
@@ -1411,10 +1333,13 @@
       <img src="lappie.svg" alt="lappie.ai">
     </div>
     <div class="nav-pill-links">
-      <span class="nav-link" style="opacity:0.5; cursor:default;">coming soon</span>
+      <a href="#offering" class="nav-link" data-section="offering">how we work</a>
+      <a href="#proof" class="nav-link" data-section="proof">proof</a>
+      <a href="#footer" class="nav-link" data-section="footer">contact</a>
     </div>
     <div class="nav-pill-divider"></div>
-    <a href="#" class="nav-pill-cta waitlist-trigger"></a>
+    <span class="nav-pill-leads-label">press for leads:</span>
+    <a href="#footer" class="nav-pill-cta" data-section="footer"></a>
   </div>
 
   <!-- Mobile: Logo capsule with dropdown -->
@@ -1424,10 +1349,13 @@
     </div>
     <div class="nav-logo-menu">
       <div class="nav-logo-menu-inner">
-        <span class="nav-drop-link" style="opacity:0.5; cursor:default;">coming soon</span>
+        <a href="#offering" class="nav-drop-link" data-section="offering">how we work</a>
+        <a href="#proof" class="nav-drop-link" data-section="proof">proof</a>
+        <a href="#footer" class="nav-drop-link" data-section="footer">contact</a>
+        <span class="nav-leads-label">press for leads:</span>
       </div>
       <div class="nav-leads-btn-wrap">
-        <a href="#" class="nav-leads-btn waitlist-trigger"></a>
+        <a href="#footer" class="nav-leads-btn" data-section="footer"></a>
       </div>
     </div>
   </div>
@@ -1441,12 +1369,17 @@
       <div class="nav-ctrl-menu-inner">
         <button class="theme-option active" data-theme-value="light">
           <span class="theme-swatch" style="background:#edecea;"></span>
-          Light
+          Daylight
           <svg class="theme-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
         <button class="theme-option" data-theme-value="dark">
           <span class="theme-swatch" style="background:#141210;"></span>
-          Dark
+          Midnight
+          <svg class="theme-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+        <button class="theme-option" data-theme-value="savanna">
+          <span class="theme-swatch" style="background:#f5e6c8;"></span>
+          Savanna
           <svg class="theme-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
         <button class="theme-option" data-theme-value="ocean">
@@ -1454,9 +1387,14 @@
           Ocean
           <svg class="theme-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
+        <button class="theme-option" data-theme-value="blush">
+          <span class="theme-swatch" style="background:linear-gradient(135deg,#e8e4e0,#8090a0);"></span>
+          Slate
+          <svg class="theme-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
         <button class="theme-option" data-theme-value="moss">
           <span class="theme-swatch" style="background:linear-gradient(135deg,#0e1a0f,#5a8040);"></span>
-          Mountain
+          Moss
           <svg class="theme-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
         <button class="nav-mic-text-btn" id="mic-btn" title="Toggle microphone">enable mic</button>
@@ -1482,12 +1420,12 @@
 <!-- Hero — normal block in flow, above canvas -->
 <section class="section section--hero" data-section="hero">
   <div class="hero-content">
-    <span class="hero-label blur-reveal"><span class="label-line">AI ORCHESTRATION STUDIO</span></span>
-    <h1 class="blur-reveal">it's time to <strong>clean up.</strong></h1>
-    <p class="blur-reveal">We design and build AI systems that manage your operations, grow your revenue, and elevate your brand.</p>
+    <span class="hero-label blur-reveal"><span class="label-line">AI ORCHESTRATION STUDIO</span><span class="label-separator"> | </span><span class="label-line">CAPE TOWN, SOUTH AFRICA</span></span>
+    <h1 class="blur-reveal">the difference between ai slop and <strong>ai that sells.</strong></h1>
+    <p class="blur-reveal">We design and build AI systems that grow your business and elevate your brand.</p>
     <div class="hero-buttons blur-reveal-group">
-      <a href="#" class="btn-secondary waitlist-trigger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><span class="btn-text-full">coming soon</span><span class="btn-text-mobile">coming soon</span></a>
-      <a href="#" class="btn-primary waitlist-trigger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></svg><span class="btn-text-full">coming soon</span></a>
+      <a href="#offering" class="btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><span class="btn-text-full">explore lead generation</span><span class="btn-text-mobile">lead generation</span></a>
+      <a href="#footer" class="btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></svg><span class="btn-text-full">let's chat</span></a>
     </div>
   </div>
 </section>
@@ -1495,29 +1433,86 @@
 <!-- 3D Canvas wrapper — pins canvas while content scrolls over -->
 <div class="canvas-pin-wrapper">
   <div class="canvas-container" id="canvas-container"></div>
+  <div class="cloth-hint" id="cloth-hint">CLICK, DRAG OR PRESS PLAY & LET ME DANCE</div>
   <div id="scroll-content">
-  <!-- Cloth hint — independent of footer -->
-  <p class="cs-cloth-hint">In the meantime, enjoy playing with the cloth.</p>
-  <!-- Minimal footer at bottom of viewport -->
-  <div class="cs-footer">
-    <img src="lappie.svg" alt="lappie.ai">
-    <p>CAPE TOWN, SOUTH AFRICA</p>
-  </div>
+
+  <section class="section section--statement" data-section="statement">
+    <div class="statement-text">
+      <h1 class="blur-reveal">most ai looks like ai.<br><strong>yours shouldn't.</strong></h1>
+      <p class="blur-reveal">Artificial Intelligence has become a baseline. Your advantage now has to come from doing it right.</p>
+    </div>
+  </section>
+
+  <section class="section section--tension" data-section="tension">
+    <div class="tension-text">
+      <h2 class="blur-reveal">agentic orchestration,<br><strong>delivered with taste</strong></h2>
+      <p class="blur-reveal">Intelligent systems that elevate your business across marketing, operations and product.</p>
+    </div>
+  </section>
+
+  <section class="section section--midcta" data-section="midcta">
+    <div class="midcta-content">
+      <div class="spinwave-container" id="spinwave"></div>
+      <a href="#footer" class="cta-btn" id="midcta-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></svg>let's chat</a>
+    </div>
+  </section>
+
+  <section class="section section--offering" data-section="offering">
+    <div class="offering-header">
+      <h2>what we do</h2>
+      <p>Three ways we help South African companies adopt AI.</p>
+    </div>
+    <div class="offering-cards">
+      <div class="offering-card">
+        <div class="card-number">01</div>
+        <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <h3>operations</h3>
+        <p>Automate the mundane. We audit your workflows and deploy AI agents that handle the repetitive — so your team handles what matters.</p>
+      </div>
+      <div class="offering-card">
+        <div class="card-number">02</div>
+        <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <h3>marketing</h3>
+        <p>Create at the speed of culture. AI-powered content pipelines, audience intelligence, and campaign automation that actually understands your brand.</p>
+      </div>
+      <div class="offering-card">
+        <div class="card-number">03</div>
+        <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        <h3>product</h3>
+        <p>Build what's next. From AI feature integration to full product strategy, we help you ship intelligent products your users didn't know they needed.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--proof" data-section="proof">
+    <div class="proof-text">
+      <span class="proof-quote-mark">"</span>
+      <blockquote>they didn't just give us tools. they rewired how we think about our business.</blockquote>
+      <cite>— Future Client, Future Company</cite>
+    </div>
+  </section>
+
+  <section class="section section--footer" data-section="footer">
+    <div class="footer-cta">
+      <h2>ready when you are.</h2>
+      <a href="#" class="cta-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>start a conversation</a>
+      <span class="close-secondary">or just keep playing with the cloth. we get it.</span>
+    </div>
+    <div class="footer-bottom">
+      <div class="footer-links">
+        <a href="#">about</a>
+        <a href="#">case studies</a>
+        <a href="#">contact</a>
+      </div>
+      <div class="footer-brand">
+        <img src="lappie.svg" alt="lappie.ai">
+        <p>AI ORCHESTRATION STUDIO | CAPE TOWN, SOUTH AFRICA</p>
+      </div>
+    </div>
+  </section>
+
   </div><!-- /#scroll-content -->
 </div><!-- /.canvas-pin-wrapper -->
-
-<!-- Waitlist modal -->
-<div class="waitlist-overlay" id="waitlist-overlay">
-  <div class="waitlist-modal">
-    <h2>join the waitlist</h2>
-    <p class="waitlist-desc">Leave your email and we'll let you know when we're live.</p>
-    <form class="waitlist-form" id="waitlist-form">
-      <input type="email" placeholder="your email" required id="waitlist-email">
-      <button type="submit" id="waitlist-submit">🧽</button>
-    </form>
-    <p class="waitlist-thanks" id="waitlist-thanks" style="display:none">Chat soon.</p>
-  </div>
-</div>
 
 <!-- Lenis smooth scroll -->
 <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.min.js"></script>
@@ -1566,7 +1561,9 @@ const CLOTH_COLORS = [
 // Per-theme pattern assignments — each theme cycles the same 5 colours but with different patterns
 const THEME_PATTERNS = {
   daylight: ['teatowel', 'kente',   'breton',  'ikat',    'shibori'],
+  savanna:  ['kente',    'ikat',    'teatowel','shibori', 'breton'],
   ocean:    ['breton',   'shibori', 'ikat',    'teatowel','kente'],
+  blush:    ['ikat',     'breton',  'shibori', 'kente',   'teatowel'],
   moss:     ['shibori',  'teatowel','kente',   'breton',  'ikat'],
 };
 THEME_PATTERNS.midnight = THEME_PATTERNS.daylight;
@@ -1580,7 +1577,7 @@ for (const [theme, patterns] of Object.entries(THEME_PATTERNS)) {
 }
 
 // Map theme data-values to cloth keys
-const THEME_KEY_MAP = { light: 'daylight', dark: 'midnight', ocean: 'ocean', moss: 'moss' };
+const THEME_KEY_MAP = { light: 'daylight', dark: 'midnight', savanna: 'savanna', ocean: 'ocean', blush: 'blush', moss: 'moss' };
 
 let currentClothKey = 'daylight';
 let paletteIdx = 0;
@@ -1678,10 +1675,10 @@ const micBtn = document.getElementById('mic-btn');
 
 // Song cycling system
 const songUrls = [
-  'https://assets.mixkit.co/music/135/135.mp3',
-  'https://assets.mixkit.co/music/139/139.mp3',
-  'https://assets.mixkit.co/music/588/588.mp3',
-  'https://assets.mixkit.co/music/175/175.mp3',
+  'https://assets.mixkit.co/music/146/146.mp3',
+  'https://assets.mixkit.co/music/127/127.mp3',
+  'https://assets.mixkit.co/music/151/151.mp3',
+  'https://assets.mixkit.co/music/154/154.mp3',
 ];
 let currentSongIndex = 0;
 
@@ -1971,6 +1968,9 @@ let logoPillIsWide = false;
 
 function openLogoMenu() {
   if (logoPillIsWide && logoMenuIsOpen) return;
+  // Close mobile ctrl popup if open
+  const mPopup = document.getElementById('mobile-ctrl-popup');
+  if (mPopup) mPopup.classList.remove('open');
   logoCapsule.classList.add('pill-wide');
   logoPillIsWide = true;
   // Animate logo to center of expanded pill
@@ -2007,15 +2007,8 @@ function closeLogoMenu() {
 
 logoHeader.addEventListener('click', (e) => {
   e.stopPropagation();
-  if (logoMenuIsOpen) {
-    closeLogoMenu();
-  } else if (isMobile && window._mCtrlOpen) {
-    // Close ctrl menu first, then open logo after animation
-    window._closeMobileCtrl();
-    setTimeout(openLogoMenu, 500);
-  } else {
-    openLogoMenu();
-  }
+  if (logoMenuIsOpen) closeLogoMenu();
+  else openLogoMenu();
 });
 
 document.addEventListener('click', (e) => {
@@ -2169,74 +2162,20 @@ if (isMobile) {
   playWrap.appendChild(mobilePlayBtn);
   mCtrlPopup.appendChild(playWrap);
 
-  let mCtrlMenuOpenTimer = null;
-
-  // Measure dropdown's natural width once
-  let dropdownNaturalWidth = 0;
-  function measureDropdown() {
-    mCtrlPopup.style.maxHeight = 'none';
-    mCtrlPopup.style.opacity = '0';
-    mCtrlPopup.style.pointerEvents = 'none';
-    mCtrlPopup.style.position = 'absolute';
-    mCtrlPopup.style.visibility = 'hidden';
-    mCtrlPopup.style.width = 'auto';
-    mCtrlPopup.style.transform = 'none';
-    dropdownNaturalWidth = mCtrlPopup.offsetWidth;
-    // Reset
-    mCtrlPopup.style.maxHeight = '';
-    mCtrlPopup.style.opacity = '';
-    mCtrlPopup.style.pointerEvents = '';
-    mCtrlPopup.style.position = '';
-    mCtrlPopup.style.visibility = '';
-    mCtrlPopup.style.width = '';
-    mCtrlPopup.style.transform = '';
-  }
-  // Measure after content is populated
-  requestAnimationFrame(measureDropdown);
-
   function openMobileCtrl() {
-    if (mCtrlOpen) return;
     mCtrlOpen = true;
-    // Calculate pill width = dropdown / 0.75
-    if (!dropdownNaturalWidth) measureDropdown();
-    const pillWidth = Math.round(dropdownNaturalWidth / 0.75 * 1.2);
-    mCtrlBtn.style.minWidth = pillWidth + 'px';
-    mCtrl.classList.add('pill-wide');
-    // After pill expands, open dropdown
-    clearTimeout(mCtrlMenuOpenTimer);
-    mCtrlMenuOpenTimer = setTimeout(() => {
-      mCtrlPopup.classList.add('open');
-    }, 300);
+    mCtrlPopup.classList.add('open');
   }
   function closeMobileCtrl() {
-    clearTimeout(mCtrlMenuOpenTimer);
     mCtrlOpen = false;
-    // Close dropdown first
     mCtrlPopup.classList.remove('open');
-    // After dropdown closes, collapse pill
-    setTimeout(() => {
-      if (!mCtrlOpen) {
-        mCtrl.classList.remove('pill-wide');
-        mCtrlBtn.style.minWidth = '';
-      }
-    }, 400);
   }
-
-  // Expose for cross-menu coordination with logo menu
-  Object.defineProperty(window, '_mCtrlOpen', { get: () => mCtrlOpen });
-  window._closeMobileCtrl = closeMobileCtrl;
 
   mCtrlBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (mCtrlOpen) {
-      closeMobileCtrl();
-    } else if (logoMenuIsOpen) {
-      // Close logo menu first, then open ctrl after animation
-      closeLogoMenu();
-      setTimeout(openMobileCtrl, 500);
-    } else {
-      openMobileCtrl();
-    }
+    // Close logo menu if open
+    if (logoMenuIsOpen) closeLogoMenu();
+    mCtrlOpen ? closeMobileCtrl() : openMobileCtrl();
   });
 
   document.addEventListener('click', (e) => {
@@ -2256,6 +2195,15 @@ if (isMobile) {
     if (scroll <= 80) mCtrl.classList.remove('nav-hidden');
   });
 
+  // On page load: open both menus for 1 second, then close
+  setTimeout(() => {
+    openLogoMenu();
+    openMobileCtrl();
+    setTimeout(() => {
+      closeLogoMenu();
+      closeMobileCtrl();
+    }, 1000);
+  }, 700);
 }
 
 // Global scroll progress [0..1] over entire page
@@ -2300,18 +2248,37 @@ ScrollTrigger.create({
   pinSpacing: false,
 });
 
-// ── Scroll stop when cloth first reaches center (hero clears viewport) ──
+// ── Smooth scroll stops (downward only) ──
+let snapCooldown = false;
+function createSnapStop(selector) {
+  ScrollTrigger.create({
+    trigger: selector,
+    start: 'center 65%',
+    end: 'center 35%',
+    onEnter: () => {
+      if (snapCooldown) return;
+      snapCooldown = true;
+      lenis.scrollTo(selector, { offset: -window.innerHeight / 2 + document.querySelector(selector).offsetHeight / 2, duration: 1.2, lock: true });
+      setTimeout(() => { snapCooldown = false; }, 1500);
+    },
+  });
+}
+
+// Scroll stop when cloth first reaches center screen (hero clears viewport)
 let clothFirstRevealDone = false;
 ScrollTrigger.create({
   trigger: '.section--hero',
   start: 'bottom top',
   onEnter: () => {
-    if (clothFirstRevealDone) return;
+    if (clothFirstRevealDone || snapCooldown) return;
     clothFirstRevealDone = true;
+    snapCooldown = true;
     // Snap so cloth sits centered
     lenis.scrollTo('.canvas-pin-wrapper', { offset: 0, duration: 1.2, lock: true });
+    setTimeout(() => { snapCooldown = false; }, 1500);
 
     if (!isMobile) {
+      // Desktop: open ctrl menu + pulse play button
       openCtrlMenu();
       clearTimeout(ctrlMenuAutoTimer);
       ctrlMenuAutoTimer = setTimeout(closeCtrlMenu, 5000);
@@ -2321,20 +2288,145 @@ ScrollTrigger.create({
       btn.addEventListener('click', stopPulse);
       setTimeout(stopPulse, 5000);
     } else {
+      // Mobile: pop open ctrl dropdown for 2s with play button glowing
       const mCtrlEl = document.getElementById('mobile-ctrl');
       const mCtrlPopupEl = document.getElementById('mobile-ctrl-popup');
       const mPlayBtn = mCtrlPopupEl?.querySelector('.mobile-ctrl-play');
+      // Ensure nav is visible
       mCtrlEl.classList.remove('nav-hidden');
       mCtrlPopupEl.classList.add('open');
       if (mPlayBtn) mPlayBtn.classList.add('attention-pulse');
       setTimeout(() => {
         mCtrlPopupEl.classList.remove('open');
-        if (mPlayBtn) mPlayBtn.classList.remove('attention-pulse');
+        if (mPlayBtn) {
+          mPlayBtn.classList.remove('attention-pulse');
+          mPlayBtn.addEventListener('click', () => mPlayBtn.classList.remove('attention-pulse'), { once: true });
+        }
       }, 3500);
     }
 
+    // Show cloth interaction hint (quick entrance)
+    const hint = document.getElementById('cloth-hint');
+    setTimeout(() => { hint.classList.add('visible'); }, 400);
   },
 });
+
+// Hide cloth hint on further scroll
+ScrollTrigger.create({
+  trigger: '.section--statement',
+  start: 'top 90%',
+  onEnter: () => {
+    const hint = document.getElementById('cloth-hint');
+    hint.classList.remove('visible');
+  },
+});
+
+// First time reaching statement — simulate a click on cloth center
+let statementClickFired = false;
+createSnapStop('.statement-text');
+ScrollTrigger.create({
+  trigger: '.statement-text',
+  start: 'center 65%',
+  onEnter: () => {
+    if (statementClickFired) return;
+    statementClickFired = true;
+    // Delay 2s so user can read the text first
+    setTimeout(() => {
+      const centerRow = Math.floor(ROWS / 2);
+      const centerCol = Math.floor(COLS / 2);
+      const ci = centerRow * COLS + centerCol;
+      const wp = new THREE.Vector3(pos[ci * 3], pos[ci * 3 + 1], pos[ci * 3 + 2]);
+      rippleAndSwitch(wp);
+    }, 2000);
+  },
+});
+// Mobile: forced scroll stop when cloth wipes back to center between statement → tension
+// Heavy friction — cloth resists being pushed away, locks scroll, slows Lenis
+let mobileClothSnapFired = false;
+if (isMobile) {
+  ScrollTrigger.create({
+    trigger: '.section--tension',
+    start: 'top 90%',
+    end: 'top 60%',
+    onEnter: () => {
+      if (snapCooldown) return;
+      snapCooldown = true;
+      // Snap hard to the cloth-centered position
+      lenis.scrollTo('.section--tension', {
+        offset: -window.innerHeight * 0.75 + 1,
+        duration: 1.6,
+        lock: true,
+      });
+      // Slow Lenis way down — makes it feel like pushing through resistance
+      const origLerp = lenis.options.lerp;
+      lenis.options.lerp = 0.02; // very sluggish
+      setTimeout(() => { lenis.options.lerp = 0.04; }, 2000);  // ease back gradually
+      setTimeout(() => { lenis.options.lerp = origLerp; snapCooldown = false; }, 3500);
+
+      // First time only: simulate click on cloth (ripple + color change)
+      if (!mobileClothSnapFired) {
+        mobileClothSnapFired = true;
+        setTimeout(() => {
+          const centerRow = Math.floor(ROWS / 2);
+          const centerCol = Math.floor(COLS / 2);
+          const ci = centerRow * COLS + centerCol;
+          const wp = new THREE.Vector3(pos[ci * 3], pos[ci * 3 + 1], pos[ci * 3 + 2]);
+          rippleAndSwitch(wp);
+        }, 800);
+      }
+    },
+  });
+}
+
+// Tension scroll stop — gather-and-release (pull inward then spring back)
+let tensionGatherFired = false;
+createSnapStop('.tension-text');
+ScrollTrigger.create({
+  trigger: '.tension-text',
+  start: 'center 65%',
+  onEnter: () => {
+    if (tensionGatherFired) return;
+    tensionGatherFired = true;
+    // Briefly pull all particles toward center then release
+    const gatherDuration = 0.4; // seconds
+    const gatherStart = time;
+    const gatherStrength = 8.0;
+    function gatherStep() {
+      const elapsed = time - gatherStart;
+      if (elapsed > gatherDuration) return;
+      const t = elapsed / gatherDuration;
+      const force = gatherStrength * Math.sin(t * Math.PI); // ramp up then down
+      for (let i = 0; i < numParticles; i++) {
+        if (invMass[i] === 0) continue;
+        const px = pos[i*3], py = pos[i*3+1], pz = pos[i*3+2];
+        // Pull toward mesh center
+        vel[i*3]     -= px * force * 0.02 / SUBSTEPS;
+        vel[i*3 + 1] -= py * force * 0.02 / SUBSTEPS;
+        vel[i*3 + 2] -= pz * force * 0.01 / SUBSTEPS;
+      }
+      requestAnimationFrame(gatherStep);
+    }
+    gatherStep();
+  },
+});
+createSnapStop('.midcta-content');
+
+// MidCTA scroll stop — ripple from center when text appears
+let midctaRippleFired = false;
+ScrollTrigger.create({
+  trigger: '.section--midcta',
+  start: 'top 70%',
+  onEnter: () => {
+    if (midctaRippleFired) return;
+    midctaRippleFired = true;
+    const centerRow = Math.floor(ROWS / 2);
+    const centerCol = Math.floor(COLS / 2);
+    const ci = centerRow * COLS + centerCol;
+    const wp = new THREE.Vector3(pos[ci * 3], pos[ci * 3 + 1], pos[ci * 3 + 2]);
+    addRipple(wp);
+  },
+});
+createSnapStop('.section--offering');
 
 // ═══════════════════════════════════════════════
 // BLUR REVEAL TEXT ANIMATION
@@ -2397,8 +2489,8 @@ document.querySelectorAll('.blur-reveal-group').forEach(el => {
   });
 });
 
-// (spinwave removed for coming-soon)
-if (false) { // SPINTOWAVE
+// ═══════════════════════════════════════════════
+// SPINTOWAVE → WAVECONSTANT (exact port from Remotion)
 // Phase 1: SpinToWave entrance (spring slide-up, sparkles, wave blend-in)
 // Phase 2: WaveConstant (continuous dual-sine wave, glass letters)
 // ═══════════════════════════════════════════════
@@ -2685,7 +2777,7 @@ if (false) { // SPINTOWAVE
       }, 1500);
     }
   });
-})(); }
+})();
 
 // ═══════════════════════════════════════════════
 // THREE.JS SETUP
@@ -3535,11 +3627,99 @@ function switchPalette() {
 
 
 // ═══════════════════════════════════════════════
-// CLOTH POSE — static center (no scroll choreography)
+// SCROLL-DRIVEN CLOTH CHOREOGRAPHY
 // ═══════════════════════════════════════════════
-const CY = isMobile ? -0.2 : -0.5;
-const clothPose = { x: 0, y: CY, z: 0, scaleX: isMobile ? 0.7 : 1, scaleY: isMobile ? 0.7 : 1, scaleZ: isMobile ? 0.7 : 1 };
+// Cloth pose targets driven by scroll — mesh transform (not particles)
+// Camera lookAt = (0, -0.5, 0) = screen center.
+// Hero section has opaque bg, scrolls away to reveal the canvas + cloth.
+const clothPose = {
+  x: 0, y: -0.5, z: 0,
+  scaleX: 1, scaleY: 1, scaleZ: 1,
+};
+
+const CY = -0.5; // screen-center Y
+
+const clothTL = gsap.timeline({
+  scrollTrigger: {
+    trigger: '.canvas-pin-wrapper',
+    start: 'top top',
+    end: 'bottom bottom',
+    scrub: 0.8,
+  }
+});
+
+if (isMobile) {
+  // VERIFIED section visibility (from debug):
+  //   Statement text triggers ~20%, centered ~28%, exits ~33%
+  //   Tension text triggers ~39%, centered ~45%, exits ~51%
+  //   MidCTA text triggers ~49%
+  clothTL
+    // 1. Cloth revealed center (0-5%)
+    .to(clothPose, { x: 0, y: CY, scaleX: 0.7, scaleY: 0.7, scaleZ: 0.7, duration: 0.05, ease: 'none' })
+    // 2. Cloth stays center — breathing room (5-15%)
+    .to(clothPose, { duration: 0.10, ease: 'none' })
+    // 3. Exit right before statement text (15-19%)
+    .to(clothPose, { x: 5.0, y: CY, scaleX: 0.6, scaleY: 0.6, scaleZ: 0.6, duration: 0.04, ease: 'power2.in' })
+    // 4. Hold off-screen right — statement text visible (19-31%)
+    .to(clothPose, { duration: 0.12, ease: 'none' })
+    // 5. Wipe back in from right → center (31-35%) — scroll stop triggers here
+    .to(clothPose, { x: 0, y: CY, scaleX: 0.7, scaleY: 0.7, scaleZ: 0.7, duration: 0.04, ease: 'power2.out' })
+    // 6. Brief center hold — scroll stop moment (35-36%)
+    .to(clothPose, { duration: 0.01, ease: 'none' })
+    // 7. Wipe off to LEFT — tension text reveals behind it (36-39%)
+    .to(clothPose, { x: -5.0, y: CY, scaleX: 0.6, scaleY: 0.6, scaleZ: 0.6, duration: 0.03, ease: 'power2.in' })
+    // 8. Hold off-screen left — tension text visible (39-52%)
+    .to(clothPose, { duration: 0.13, ease: 'none' })
+    // 9. Return center for midCTA (52-56%)
+    .to(clothPose, { x: 0, y: CY, z: 1.0, scaleX: 1.2, scaleY: 1.2, scaleZ: 1.2, duration: 0.04, ease: 'power2.out' })
+    // 10. Hold midCTA (56-60%)
+    .to(clothPose, { duration: 0.04, ease: 'none' })
+    // 11. Exit right before offering (60-63%)
+    .to(clothPose, { x: 5.5, y: CY, z: 0, scaleX: 0.7, scaleY: 0.7, scaleZ: 0.7, duration: 0.03, ease: 'power1.in' })
+    // 12. Hold off-screen during offering + proof (63-90%)
+    .to(clothPose, { x: 5.5, duration: 0.27, ease: 'none' })
+    // 13. Re-enter for footer (90-100%)
+    .to(clothPose, { x: 0, y: CY - 0.85, z: 0, scaleX: 0.55, scaleY: 0.55, scaleZ: 0.55, duration: 0.06, ease: 'power2.out' });
+} else {
+  clothTL
+    // Centered — revealed as hero scrolls away
+    .to(clothPose, { x: 0, y: CY, scaleX: 1, scaleY: 1, scaleZ: 1, duration: 0.06, ease: 'none' })
+    // Breathing room — cloth alone (reduced 20%)
+    .to(clothPose, { duration: 0.04, ease: 'none' })
+    // → Slow glide to RIGHT before statement text
+    .to(clothPose, { x: 2.4, y: CY, scaleX: 0.85, scaleY: 0.85, scaleZ: 0.85, duration: 0.12, ease: 'power1.inOut' })
+    .to(clothPose, { duration: 0.08, ease: 'none' })
+    // → Slow glide to LEFT before tension text
+    .to(clothPose, { x: -3.0, y: CY, scaleX: 0.8, scaleY: 0.8, scaleZ: 0.8, duration: 0.12, ease: 'power1.inOut' })
+    .to(clothPose, { duration: 0.08, ease: 'none' })
+    // → Center + fill viewport for midCTA (80% of original 2.4)
+    .to(clothPose, { x: 0, y: CY, z: 1.5, scaleX: 1.75, scaleY: 1.75, scaleZ: 1.75, duration: 0.08, ease: 'power1.inOut' })
+    // → Slide right after midCTA — mostly off-screen right
+    .to(clothPose, { x: 5.5, y: CY, z: 0, scaleX: 0.9, scaleY: 0.9, scaleZ: 0.9, duration: 0.10, ease: 'power1.in' })
+    // Hold right during offering + proof
+    .to(clothPose, { x: 5.5, duration: 0.14, ease: 'none' })
+    // → Wipe back in from RIGHT, settle at bottom-center of viewport
+    .to(clothPose, { x: 0, y: CY - 0.85, z: 0, scaleX: 0.7, scaleY: 0.7, scaleZ: 0.7, duration: 0.08, ease: 'power2.out' });
+}
+
+// Wind intensity varies by scroll section
 const windPose = { extra: 0 };
+const windTL = gsap.timeline({
+  scrollTrigger: {
+    trigger: '.canvas-pin-wrapper',
+    start: 'top top',
+    end: 'bottom bottom',
+    scrub: 0.6,
+  }
+});
+windTL
+  .to(windPose, { extra: 0, duration: 0.15 })
+  .to(windPose, { extra: 0.4, duration: 0.15 })
+  .to(windPose, { extra: 0.6, duration: 0.15 })
+  .to(windPose, { extra: 1.5, duration: 0.1 })
+  .to(windPose, { extra: 0.2, duration: 0.1 })
+  .to(windPose, { extra: 0, duration: 0.15 })
+  .to(windPose, { extra: 0.3, duration: 0.1 });
 
 // ═══════════════════════════════════════════════
 // DARK MODE — smooth transition factor
@@ -3609,51 +3789,6 @@ window.addEventListener('resize',()=>{
   camera.aspect=window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
-});
-
-// ═══════════════════════════════════════════════
-// WAITLIST MODAL
-// ═══════════════════════════════════════════════
-const waitlistOverlay = document.getElementById('waitlist-overlay');
-const waitlistForm = document.getElementById('waitlist-form');
-const waitlistThanks = document.getElementById('waitlist-thanks');
-
-function openWaitlist(e) {
-  if (e) e.preventDefault();
-  waitlistOverlay.classList.add('open');
-  lenis.stop();
-}
-function closeWaitlist() {
-  waitlistOverlay.classList.remove('open');
-  lenis.start();
-}
-
-document.querySelectorAll('.waitlist-trigger').forEach(el => el.addEventListener('click', openWaitlist));
-waitlistOverlay.addEventListener('click', (e) => { if (e.target === waitlistOverlay) closeWaitlist(); });
-
-// Show/hide submit button based on input
-const waitlistEmail = document.getElementById('waitlist-email');
-const waitlistSubmit = document.getElementById('waitlist-submit');
-waitlistEmail.addEventListener('input', () => {
-  if (waitlistEmail.value.trim().length > 0) {
-    waitlistSubmit.classList.add('show');
-  } else {
-    waitlistSubmit.classList.remove('show');
-  }
-});
-
-waitlistForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  waitlistSubmit.disabled = true;
-  try {
-    await fetch('https://sheetdb.io/api/v1/ov36u1vv9u9od', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: { name: '', email: waitlistEmail.value, reason: 'coming_soon', timestamp: new Date().toISOString() } }),
-    });
-  } catch (err) { /* still show thanks */ }
-  waitlistForm.style.display = 'none';
-  waitlistThanks.style.display = 'block';
 });
 
 

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mobile Preview — lappie.ai</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a1a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: -apple-system, sans-serif;
+    color: #aaa;
+  }
+  .controls {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 10px; z-index: 10;
+  }
+  .controls button {
+    padding: 8px 16px; border: 1px solid #444; border-radius: 6px;
+    background: #2a2a2a; color: #ccc; cursor: pointer; font-size: 13px;
+  }
+  .controls button:hover { background: #3a3a3a; }
+  .controls button.active { background: #941F1A; border-color: #941F1A; color: white; }
+  .phone-frame {
+    position: relative;
+    border: 3px solid #333;
+    border-radius: 40px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 0 0 2px #222;
+    transition: width 0.3s ease, height 0.3s ease;
+  }
+  .phone-frame iframe {
+    width: 100%; height: 100%; border: none; display: block;
+  }
+  .label {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: #555;
+  }
+</style>
+</head>
+<body>
+  <div class="controls">
+    <button onclick="setSize(375, 812, this)" class="active">iPhone SE</button>
+    <button onclick="setSize(390, 844, this)">iPhone 14</button>
+    <button onclick="setSize(430, 932, this)">iPhone 15 Pro Max</button>
+    <button onclick="setSize(412, 915, this)">Pixel 7</button>
+    <button onclick="setSize(768, 1024, this)">iPad Mini</button>
+    <button onclick="setSize(820, 1180, this)">iPad Air</button>
+  </div>
+  <div class="phone-frame" id="frame" style="width:375px;height:812px;">
+    <iframe src="index.html"></iframe>
+  </div>
+  <div class="label" id="label">375 × 812</div>
+  <script>
+    function setSize(w, h, btn) {
+      document.getElementById('frame').style.width = w + 'px';
+      document.getElementById('frame').style.height = h + 'px';
+      document.getElementById('label').textContent = w + ' × ' + h;
+      document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+  </script>
+</body>
+</html>
